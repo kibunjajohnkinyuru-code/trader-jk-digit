@@ -350,12 +350,50 @@ confidence = Math.min(
        * This is a ranking strength only.
        * It is NOT the probability of the next digit.
        */
-      let strength =
-        overallRate * 0.50 +
-        recent20Rate * 0.25 +
-        recent10Rate * 0.10 +
-        overallDeviation * 0.15;
+      /*
+ * Conservative Match Strength.
+ *
+ * 60% = overall 100-tick frequency
+ * 25% = last 20 ticks
+ * 15% = last 10 ticks
+ *
+ * Baseline deviation is used as a small
+ * supporting factor, not as a prediction.
+ *
+ * This is a ranking strength only.
+ * It is NOT the probability of the next digit.
+ */
+let strength =
+  overallRate * 0.60 +
+  recent20Rate * 0.25 +
+  recent10Rate * 0.15;
 
+/*
+ * Small bonus for digits that are
+ * consistently above the 10% baseline.
+ */
+if (
+  overallRate >= BASELINE &&
+  recent20Rate >= BASELINE &&
+  recent10Rate >= BASELINE
+) {
+  strength += 2;
+}
+
+/*
+ * Penalize digits below the baseline overall.
+ */
+if (overallRate < BASELINE) {
+  strength *= 0.75;
+}
+
+/*
+ * Keep the ranking score within 0–100.
+ */
+strength = Math.min(
+  Math.max(strength, 0),
+  100
+);
       /*
        * Penalize digits that are below
        * the 10% baseline overall.
