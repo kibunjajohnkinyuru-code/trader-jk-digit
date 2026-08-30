@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import WebSocket, { RawData } from "ws";
 
+export const runtime = "nodejs";
+
 export async function GET() {
   return new Promise<NextResponse>((resolve) => {
     const ws = new WebSocket(
@@ -26,7 +28,6 @@ export async function GET() {
       ws.send(
         JSON.stringify({
           active_symbols: "brief",
-          product_type: "basic",
           req_id: 1,
         })
       );
@@ -116,7 +117,7 @@ export async function GET() {
       }
     });
 
-    ws.on("error", (error: Error) => {
+        ws.on("error", (error: Error) => {
       clearTimeout(timeout);
 
       resolve(
@@ -132,4 +133,4 @@ export async function GET() {
       );
     });
   });
-        }
+ }
