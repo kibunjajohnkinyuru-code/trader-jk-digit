@@ -12,10 +12,8 @@ export default function Home() {
 
   const [price, setPrice] = useState<string | null>(null);
   const [lastDigit, setLastDigit] = useState<number | null>(null);
-
   const [connection, setConnection] = useState("Starting");
   const [status, setStatus] = useState("Waiting for ticks");
-
   const [history, setHistory] = useState<number[]>([]);
 
   useEffect(() => {
@@ -28,9 +26,7 @@ export default function Home() {
 
         const response = await fetch(
           `/api/deriv-tick?symbol=${encodeURIComponent(market)}`,
-          {
-            cache: "no-store",
-          }
+          { cache: "no-store" }
         );
 
         const data = await response.json();
@@ -40,7 +36,6 @@ export default function Home() {
         if (!response.ok || !data.ok) {
           setConnection("Error");
           setStatus("Feed error");
-
           timer = setTimeout(getTick, 3000);
           return;
         }
@@ -50,7 +45,6 @@ export default function Home() {
         if (!Number.isInteger(digit) || digit < 0 || digit > 9) {
           setConnection("Error");
           setStatus("Invalid digit");
-
           timer = setTimeout(getTick, 3000);
           return;
         }
@@ -61,15 +55,13 @@ export default function Home() {
         setStatus("Live");
 
         setHistory((previous) => {
-          const updated = [...previous, digit];
-          return updated.slice(-MAX_HISTORY);
+          return [...previous, digit].slice(-MAX_HISTORY);
         });
       } catch {
         if (!active) return;
 
         setConnection("Error");
         setStatus("Connection failed");
-
         timer = setTimeout(getTick, 3000);
         return;
       }
@@ -88,61 +80,74 @@ export default function Home() {
   }, [market]);
 
   const counts = useMemo(() => {
-    const result: Record<number, number> = {};
+    const result = Array(10).fill(0) as number[];
 
-    digits.forEach((digit) => {
-      result[digit] = 0;
-    });
-
-    history.forEach((digit) => {
-      result[digit]++;
-    });
+    for (const digit of history) {
+      if (digit >= 0 && digit <= 9) {
+        result[digit]++;
+      }
+    }
 
     return result;
   }, [history]);
 
-  const match = counts[selectedDigit];
-  const nonMatch = history.length - match;
+  const targetCount = counts[selectedDigit];
 
-  const matchPercentage =
+  const nonMatch = history.length - targetCount;
+
+  const matchRate =
     history.length > 0
-      ? (match / history.length) * 100
+      ? (targetCount / history.length) * 100
       : 0;
 
-  const nonMatchPercentage =
+  const nonMatchRate =
     history.length > 0
       ? (nonMatch / history.length) * 100
       : 0;
 
-  const selectedDifference =
-    matchPercentage - BASELINE;
-
   const ranking = useMemo(() => {
-    return [...digits].sort((a, b) => {
-      if (counts[b] !== counts[a]) {
-        return counts[b] - counts[a];
-      }
+    return digits
+      .map((digit) => ({
+        digit,
+        count: counts[digit],
+        rate:
+          history.length > 0
+            ? (counts[digit] / history.length) * 100
+            : 0,
+      }))
+      .sort((a, b) => {
+        if (b.count !== a.count) {
+          return b.count - a.count;
+        }
 
-      return a - b;
-    });
-  }, [counts]);
-
-  const mostFrequentDigit =
-    history.length > 0 ? ranking[0] : null;
-
-  const leastFrequentDigit = useMemo(() => {
-    if (history.length === 0) return null;
-
-    return [...digits].sort((a, b) => {
-      if (counts[a] !== counts[b]) {
-        return counts[a] - counts[b];
-      }
-
-      return a - b;
-    })[0];
+        return a.digit - b.digit;
+      });
   }, [counts, history.length]);
 
-  const selectedStreak = useMemo(() => {
+  const mostFrequent = ranking[0];
+
+  const leastFrequent = useMemo(() => {
+    return [...ranking].sort((a, b) => {
+      if (a.count !== b.count) {
+        return a.count - b.count;
+      }
+
+      return a.digit - b.digit;
+    })[0];
+  }, [ranking]);
+
+  const recent20 = history.slice(-20);
+
+  const recentTargetCount = recent20.filter(
+    (digit) => digit === selectedDigit
+  ).length;
+
+  const recentTargetRate =
+    recent20.length > 0
+      ? (recentTargetCount / recent20.length) * 100
+      : 0;
+
+  const currentStreak = useMemo(() => {
     let streak = 0;
 
     for (let i = history.length - 1; i >= 0; i--) {
@@ -156,42 +161,29 @@ export default function Home() {
     return streak;
   }, [history, selectedDigit]);
 
-  const recentTargetCount = useMemo(() => {
-    const recent = history.slice(-20);
-
-    return recent.filter(
-      (digit) => digit === selectedDigit
-    ).length;
-  }, [history, selectedDigit]);
-
-  const recentTargetRate =
-    history.length > 0
-      ? (recentTargetCount /
-          Math.min(history.length, 20)) *
-        100
-      : 0;
+  const differenceFromBaseline = matchRate - BASELINE;
 
   const signal = useMemo(() => {
     if (history.length < 100) {
       return {
         title: "COLLECTING DATA",
-        detail: `${history.length}/100 digits`,
+        detail: `${history.length}/100 digits collected`,
         className: "text-yellow-400",
       };
     }
 
-    if (matchPercentage >= 15) {
+    if (matchRate >= 15) {
       return {
         title: "WATCH",
-        detail: "Target is above the 10% baseline",
+        detail: "Target frequency is above baseline",
         className: "text-green-400",
       };
     }
 
-    if (matchPercentage <= 5) {
+    if (matchRate <= 5) {
       return {
         title: "LOW FREQUENCY",
-        detail: "Target is below the 10% baseline",
+        detail: "Target frequency is below baseline",
         className: "text-orange-400",
       };
     }
@@ -201,12 +193,12 @@ export default function Home() {
       detail: "Target is near the 10% baseline",
       className: "text-yellow-400",
     };
-  }, [history.length, matchPercentage]);
+  }, [history.length, matchRate]);
 
   const resetAnalysis = () => {
     setHistory([]);
-    setLastDigit(null);
     setPrice(null);
+    setLastDigit(null);
     setStatus("Waiting for ticks");
   };
 
@@ -294,7 +286,7 @@ export default function Home() {
 
         </section>
 
-        {/* TARGET DIGIT */}
+        {/* TARGET */}
         <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
           <h2 className="font-semibold mb-4">
@@ -304,7 +296,6 @@ export default function Home() {
           <div className="grid grid-cols-5 gap-2">
 
             {digits.map((digit) => (
-
               <button
                 key={digit}
                 onClick={() => setSelectedDigit(digit)}
@@ -316,7 +307,6 @@ export default function Home() {
               >
                 {digit}
               </button>
-
             ))}
 
           </div>
@@ -369,54 +359,46 @@ export default function Home() {
 
           <div className="space-y-2">
 
-            {ranking.map((digit, index) => {
+            {ranking.map((item, index) => (
 
-              const count = counts[digit];
+              <div
+                key={item.digit}
+                className={`grid grid-cols-[24px_28px_1fr_72px] items-center gap-2 rounded-lg p-2 ${
+                  item.digit === selectedDigit
+                    ? "bg-gray-800"
+                    : ""
+                }`}
+              >
 
-              const percentage =
-                history.length > 0
-                  ? (count / history.length) * 100
-                  : 0;
+                <span className="text-xs text-gray-500">
+                  {index + 1}
+                </span>
 
-              return (
-                <div
-                  key={digit}
-                  className={`flex items-center gap-2 rounded-lg p-2 ${
-                    digit === selectedDigit
-                      ? "bg-gray-800"
-                      : ""
-                  }`}
-                >
+                <span className="font-bold">
+                  {item.digit}
+                </span>
 
-                  <span className="w-5 text-xs text-gray-500">
-                    {index + 1}
-                  </span>
+                <div className="h-3 rounded-full bg-gray-800 overflow-hidden">
 
-                  <span className="w-6 font-bold">
-                    {digit}
-                  </span>
-
-                  <div className="flex-1 h-3 rounded-full bg-gray-800 overflow-hidden">
-
-                    <div
-                      className="h-full bg-white"
-                      style={{
-                        width: `${Math.min(
-                          percentage * 5,
-                          100
-                        )}%`,
-                      }}
-                    />
-
-                  </div>
-
-                  <span className="w-16 text-right text-xs">
-                    {count} ({percentage.toFixed(1)}%)
-                  </span>
+                  <div
+                    className="h-full bg-white"
+                    style={{
+                      width: `${Math.min(
+                        item.rate * 5,
+                        100
+                      )}%`,
+                    }}
+                  />
 
                 </div>
-              );
-            })}
+
+                <span className="text-right text-xs whitespace-nowrap">
+                  {item.count} ({item.rate.toFixed(1)}%)
+                </span>
+
+              </div>
+
+            ))}
 
           </div>
 
@@ -432,6 +414,7 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-3">
 
             <div className="rounded-xl bg-gray-900 p-4">
+
               <p className="text-xs text-gray-500">
                 TARGET
               </p>
@@ -439,29 +422,35 @@ export default function Home() {
               <p className="text-3xl font-bold">
                 {selectedDigit}
               </p>
+
             </div>
 
             <div className="rounded-xl bg-gray-900 p-4">
+
               <p className="text-xs text-gray-500">
                 FREQUENCY
               </p>
 
               <p className="text-3xl font-bold">
-                {match}
+                {targetCount}
               </p>
+
             </div>
 
             <div className="rounded-xl bg-gray-900 p-4">
+
               <p className="text-xs text-gray-500">
                 MATCH RATE
               </p>
 
               <p className="text-2xl font-bold">
-                {matchPercentage.toFixed(1)}%
+                {matchRate.toFixed(1)}%
               </p>
+
             </div>
 
             <div className="rounded-xl bg-gray-900 p-4">
+
               <p className="text-xs text-gray-500">
                 BASELINE
               </p>
@@ -469,6 +458,7 @@ export default function Home() {
               <p className="text-2xl font-bold">
                 {BASELINE}%
               </p>
+
             </div>
 
           </div>
@@ -480,15 +470,15 @@ export default function Home() {
             </p>
 
             <p className="text-xl font-bold">
-              {selectedDifference >= 0 ? "+" : ""}
-              {selectedDifference.toFixed(1)}%
+              {differenceFromBaseline >= 0 ? "+" : ""}
+              {differenceFromBaseline.toFixed(1)}%
             </p>
 
           </div>
 
         </section>
 
-        {/* STREAK */}
+        {/* PATTERN */}
         <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
           <h2 className="font-semibold mb-4">
@@ -500,11 +490,11 @@ export default function Home() {
             <div className="rounded-xl bg-gray-900 p-4">
 
               <p className="text-xs text-gray-500">
-                CURRENT TARGET STREAK
+                TARGET STREAK
               </p>
 
               <p className="text-3xl font-bold">
-                {selectedStreak}
+                {currentStreak}
               </p>
 
             </div>
@@ -541,8 +531,8 @@ export default function Home() {
           </p>
 
           <p className="text-xs text-gray-600 mt-4">
-            Statistical analysis only. This does not guarantee
-            the next digit.
+            Statistical analysis only. This does not predict
+            or guarantee the next digit.
           </p>
 
         </section>
@@ -563,11 +553,11 @@ export default function Home() {
               </p>
 
               <p className="text-2xl font-bold">
-                {match}
+                {targetCount}
               </p>
 
               <p className="text-xs text-gray-400 mt-1">
-                {matchPercentage.toFixed(1)}%
+                {matchRate.toFixed(1)}%
               </p>
 
             </div>
@@ -583,7 +573,52 @@ export default function Home() {
               </p>
 
               <p className="text-xs text-gray-400 mt-1">
-                {nonMatchPercentage.toFixed(1)}%
+                {nonMatchRate.toFixed(1)}%
+              </p>
+
+            </div>
+
+          </div>
+
+        </section>
+
+        {/* SUMMARY */}
+        <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
+
+          <h2 className="font-semibold mb-4">
+            Statistics
+          </h2>
+
+          <div className="grid grid-cols-2 gap-3">
+
+            <div className="rounded-xl bg-gray-900 p-4">
+
+              <p className="text-xs text-gray-500">
+                MOST FREQUENT
+              </p>
+
+              <p className="text-3xl font-bold">
+                {mostFrequent?.digit ?? "—"}
+              </p>
+
+              <p className="text-xs text-gray-400 mt-1">
+                {mostFrequent?.count ?? 0} occurrences
+              </p>
+
+            </div>
+
+            <div className="rounded-xl bg-gray-900 p-4">
+
+              <p className="text-xs text-gray-500">
+                LEAST FREQUENT
+              </p>
+
+              <p className="text-3xl font-bold">
+                {leastFrequent?.digit ?? "—"}
+              </p>
+
+              <p className="text-xs text-gray-400 mt-1">
+                {leastFrequent?.count ?? 0} occurrences
               </p>
 
             </div>
