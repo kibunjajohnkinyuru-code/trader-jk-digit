@@ -391,13 +391,13 @@ const topSignal = useMemo(() => {
     };
   }
 
-  const { overallRate, recent20Rate, recent10Rate } =
-    topCandidate;
+  const {
+    overallRate,
+    recent20Rate,
+    recent10Rate,
+  } = topCandidate;
 
-  // Strong evidence:
-  // overall >= 15%
-  // last 20 >= 15%
-  // last 10 >= 20%
+  // Strong evidence
   if (
     overallRate >= 15 &&
     recent20Rate >= 15 &&
@@ -410,10 +410,7 @@ const topSignal = useMemo(() => {
     };
   }
 
-  // Moderate evidence:
-  // overall >= 12%
-  // last 20 >= 10%
-  // last 10 >= 10%
+  // Moderate evidence
   if (
     overallRate >= 12 &&
     recent20Rate >= 10 &&
@@ -426,21 +423,31 @@ const topSignal = useMemo(() => {
     };
   }
 
-  // Otherwise there is not enough evidence.
+  // Ranked highly, but evidence is mixed
+  if (
+    overallRate >= 10 &&
+    (recent20Rate >= 10 || recent10Rate >= 10)
+  ) {
+    return {
+      title: "WATCH",
+      detail: `Digit ${topCandidate.digit} is ranked highly but evidence is mixed`,
+      className: "text-yellow-300",
+    };
+  }
+
+  // Insufficient evidence
   return {
     title: "NO CLEAR EDGE",
     detail: `Digit ${topCandidate.digit} does not meet the minimum match thresholds`,
     className: "text-yellow-400",
   };
 }, [history.length, topCandidate]);
-  
   const resetAnalysis = () => {
-    setHistory([]);
-    setPrice(null);
-    setLastDigit(null);
-    setStatus("Waiting for ticks");
-  };
-
+  setHistory([]);
+  setPrice(null);
+  setLastDigit(null);
+  setStatus("Waiting for ticks");
+};
   return (
     <main className="min-h-screen bg-black text-white p-4">
       <div className="mx-auto max-w-md">
