@@ -6,8 +6,8 @@ export const runtime = "nodejs";
 export async function GET() {
   return new Promise<NextResponse>((resolve) => {
     const ws = new WebSocket(
-      "wss://ws.binaryws.com/websockets/v3"
-    );
+  "wss://api.derivws.com/trading/v1/options/ws/public"
+);
 
     const timeout = setTimeout(() => {
       ws.close();
