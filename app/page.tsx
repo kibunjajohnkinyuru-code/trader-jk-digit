@@ -164,37 +164,108 @@ export default function Home() {
   const differenceFromBaseline = matchRate - BASELINE;
 
   const signal = useMemo(() => {
-    if (history.length < 100) {
-      return {
-        title: "COLLECTING DATA",
-        detail: `${history.length}/100 digits collected`,
-        className: "text-yellow-400",
-      };
-    }
-
-    if (matchRate >= 15) {
-      return {
-        title: "WATCH",
-        detail: "Target frequency is above baseline",
-        className: "text-green-400",
-      };
-    }
-
-    if (matchRate <= 5) {
-      return {
-        title: "LOW FREQUENCY",
-        detail: "Target frequency is below baseline",
-        className: "text-orange-400",
-      };
-    }
-
+  if (history.length < 100) {
     return {
-      title: "NO CLEAR EDGE",
-      detail: "Target is near the 10% baseline",
+      title: "COLLECTING DATA",
+      detail: `${history.length}/100 digits collected`,
+      confidence: 0,
       className: "text-yellow-400",
     };
-  }, [history.length, matchRate]);
+  }
 
+  const recent10 = history.slice(-10);
+
+  const recent10Count = recent10.filter(
+    (digit) => digit === selectedDigit
+  ).length;
+
+  const recent10Rate =
+    (recent10Count / recent10.length) * 100;
+
+  const recent20Rate = recentTargetRate;
+
+  const overallRate = matchRate;
+
+  const overallDeviation = Math.abs(
+    overallRate - BASELINE
+  );
+
+  const recent20Deviation = Math.abs(
+    recent20Rate - BASELINE
+  );
+
+  const recent10Deviation = Math.abs(
+    recent10Rate - BASELINE
+  );
+
+  /*
+   * This is a statistical strength score.
+   * It is NOT a prediction probability.
+   */
+  let confidence =
+    40 +
+    overallDeviation * 2 +
+    recent20Deviation * 1.5 +
+    recent10Deviation;
+
+  confidence = Math.min(
+    Math.max(confidence, 0),
+    95
+  );
+
+  if (
+    overallRate >= 15 &&
+    recent20Rate >= 15 &&
+    recent10Rate >= 10
+  ) {
+    return {
+      title: "STRONG WATCH",
+      detail:
+        "Target frequency is consistently above the 10% baseline",
+      confidence,
+      className: "text-green-400",
+    };
+  }
+
+  if (
+    overallRate >= 12 &&
+    recent20Rate >= 12
+  ) {
+    return {
+      title: "WATCH",
+      detail:
+        "Target frequency is above baseline across recent samples",
+      confidence,
+      className: "text-green-400",
+    };
+  }
+
+  if (
+    overallRate <= 5 &&
+    recent20Rate <= 5
+  ) {
+    return {
+      title: "LOW FREQUENCY",
+      detail:
+        "Target frequency is substantially below baseline",
+      confidence,
+      className: "text-orange-400",
+    };
+  }
+
+  return {
+    title: "NO CLEAR EDGE",
+    detail:
+      "Recent and overall frequency do not show a strong statistical difference",
+    confidence,
+    className: "text-yellow-400",
+  };
+}, [
+  history,
+  selectedDigit,
+  recentTargetRate,
+  matchRate,
+]);
   const resetAnalysis = () => {
     setHistory([]);
     setPrice(null);
@@ -516,27 +587,39 @@ export default function Home() {
         </section>
 
         {/* SIGNAL */}
-        <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
+<section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
-          <h2 className="font-semibold mb-4">
-            Analysis Signal
-          </h2>
+  <h2 className="font-semibold mb-4">
+    Analysis Signal
+  </h2>
 
-          <p className={`text-2xl font-bold ${signal.className}`}>
-            {signal.title}
-          </p>
+  <p className={`text-2xl font-bold ${signal.className}`}>
+    {signal.title}
+  </p>
 
-          <p className="text-sm text-gray-400 mt-2">
-            {signal.detail}
-          </p>
+  <p className="text-sm text-gray-400 mt-2">
+    {signal.detail}
+  </p>
 
-          <p className="text-xs text-gray-600 mt-4">
-            Statistical analysis only. This does not predict
-            or guarantee the next digit.
-          </p>
+  <div className="mt-4 rounded-xl bg-gray-900 p-4">
 
-        </section>
+    <p className="text-xs text-gray-500">
+      STATISTICAL CONFIDENCE
+    </p>
 
+    <p className="text-3xl font-bold mt-1">
+      {signal.confidence.toFixed(0)}%
+    </p>
+
+  </div>
+
+  <p className="text-xs text-gray-600 mt-4">
+    Confidence measures statistical strength in the
+    observed sample. It is not a probability that the
+    next digit will be the target.
+  </p>
+
+</section>
         {/* MATCH */}
         <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
