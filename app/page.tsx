@@ -395,50 +395,65 @@ const topSignal = useMemo(() => {
     overallRate,
     recent20Rate,
     recent10Rate,
+    strength,
   } = topCandidate;
 
-  // Strong evidence
+  // STRONG MATCH:
+  // Requires strong overall frequency,
+  // strong recent activity, and a strong ranking score.
   if (
     overallRate >= 15 &&
     recent20Rate >= 15 &&
-    recent10Rate >= 20
+    recent10Rate >= 20 &&
+    strength >= 18
   ) {
     return {
       title: "STRONG MATCH",
-      detail: `Digit ${topCandidate.digit} has strong overall and recent frequency`,
+      detail:
+        `Digit ${topCandidate.digit} has strong overall and recent frequency`,
       className: "text-green-400",
     };
   }
 
-  // Moderate evidence
+  // MATCH:
+  // Requires elevated overall frequency
+  // and confirmation from recent activity.
   if (
     overallRate >= 12 &&
     recent20Rate >= 10 &&
-    recent10Rate >= 10
+    recent10Rate >= 10 &&
+    strength >= 14
   ) {
     return {
       title: "MATCH",
-      detail: `Digit ${topCandidate.digit} is showing elevated frequency`,
+      detail:
+        `Digit ${topCandidate.digit} is showing elevated frequency`,
       className: "text-green-300",
     };
   }
 
-  // Ranked highly, but evidence is mixed
+  // WATCH:
+  // Candidate is ranked well but evidence
+  // is not strong enough for a Match.
   if (
     overallRate >= 10 &&
+    strength >= 10 &&
     (recent20Rate >= 10 || recent10Rate >= 10)
   ) {
     return {
       title: "WATCH",
-      detail: `Digit ${topCandidate.digit} is ranked highly but evidence is mixed`,
+      detail:
+        `Digit ${topCandidate.digit} is ranked highly but evidence is mixed`,
       className: "text-yellow-300",
     };
   }
 
-  // Insufficient evidence
+  // NO CLEAR EDGE:
+  // Not enough statistical support.
   return {
     title: "NO CLEAR EDGE",
-    detail: `Digit ${topCandidate.digit} does not meet the minimum match thresholds`,
+    detail:
+      `Digit ${topCandidate.digit} does not meet the minimum match thresholds`,
     className: "text-yellow-400",
   };
 }, [history.length, topCandidate]);
