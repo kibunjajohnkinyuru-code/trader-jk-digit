@@ -268,6 +268,65 @@ export default function Home() {
   selectedDigit,
   matchRate,
 ]);
+  const matchCandidates = useMemo(() => {
+  if (history.length < 100) {
+    return [];
+  }
+
+  return digits
+    .map((digit) => {
+      const overallCount = counts[digit];
+      const overallRate =
+        (overallCount / history.length) * 100;
+
+      const recent10 = history.slice(-10);
+      const recent20 = history.slice(-20);
+
+      const recent10Count = recent10.filter(
+        (value) => value === digit
+      ).length;
+
+      const recent20Count = recent20.filter(
+        (value) => value === digit
+      ).length;
+
+      const recent10Rate =
+        (recent10Count / recent10.length) * 100;
+
+      const recent20Rate =
+        (recent20Count / recent20.length) * 100;
+
+      const overallDeviation =
+        Math.abs(overallRate - BASELINE);
+
+      const recent20Deviation =
+        Math.abs(recent20Rate - BASELINE);
+
+      const recent10Deviation =
+        Math.abs(recent10Rate - BASELINE);
+
+      let strength =
+        40 +
+        overallDeviation * 2 +
+        recent20Deviation * 1.5 +
+        recent10Deviation;
+
+      strength = Math.min(
+        Math.max(strength, 0),
+        95
+      );
+
+      return {
+        digit,
+        overallCount,
+        overallRate,
+        recent10Rate,
+        recent20Rate,
+        strength,
+      };
+    })
+    .sort((a, b) => b.strength - a.strength);
+}, [history, counts]);
   const resetAnalysis = () => {
     setHistory([]);
     setPrice(null);
@@ -550,7 +609,100 @@ export default function Home() {
           </div>
 
         </section>
+  {/* MATCH SCANNER */}
+<section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
+  <h2 className="font-semibold mb-4">
+    Match Scanner
+  </h2>
+
+  {history.length < 100 ? (
+    <p className="text-sm text-yellow-400">
+      Collecting 100 digits before scanning...
+    </p>
+  ) : (
+    <div className="space-y-3">
+
+      {matchCandidates.slice(0, 3).map((candidate, index) => (
+
+        <div
+          key={candidate.digit}
+          className="rounded-xl bg-gray-900 p-4"
+        >
+
+          <div className="flex justify-between items-center">
+
+            <div>
+              <p className="text-xs text-gray-500">
+                #{index + 1} CANDIDATE
+              </p>
+
+              <p className="text-3xl font-bold">
+                Digit {candidate.digit}
+              </p>
+            </div>
+
+            <div className="text-right">
+
+              <p className="text-xs text-gray-500">
+                MATCH STRENGTH
+              </p>
+
+              <p className="text-3xl font-bold">
+                {candidate.strength.toFixed(0)}%
+              </p>
+
+            </div>
+
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+
+            <div>
+              <p className="text-xs text-gray-500">
+                100 TICKS
+              </p>
+
+              <p className="font-bold">
+                {candidate.overallRate.toFixed(1)}%
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500">
+                LAST 20
+              </p>
+
+              <p className="font-bold">
+                {candidate.recent20Rate.toFixed(1)}%
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500">
+                LAST 10
+              </p>
+
+              <p className="font-bold">
+                {candidate.recent10Rate.toFixed(1)}%
+              </p>
+            </div>
+
+          </div>
+
+        </div>
+
+      ))}
+
+    </div>
+  )}
+
+  <p className="text-xs text-gray-600 mt-4">
+    Match Strength is a statistical ranking score,
+    not the probability of the next digit.
+  </p>
+
+</section>
         {/* PATTERN */}
         <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
