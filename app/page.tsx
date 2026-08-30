@@ -195,71 +195,78 @@ export default function Home() {
   const overallDeviation =
     Math.abs(overallRate - BASELINE);
 
-  const recent20Deviation =
     Math.abs(recent20Rate - BASELINE);
 
-  const recent10Deviation =
-    Math.abs(recent10Rate - BASELINE);
-
   /*
-   * Signal strength only.
-   * This is NOT the probability of the next digit.
+   * Conservative statistical strength.
+   * This is a ranking/analysis score only.
+   * It is NOT the probability of the next digit.
    */
   let confidence =
-    40 +
-    overallDeviation * 2 +
-    recent20Deviation * 1.5 +
-    recent10Deviation;
+    overallRate * 0.50 +
+    recent20Rate * 0.25 +
+    recent10Rate * 0.10 +
+    overallDeviation * 0.15;
+
+  if (overallRate < BASELINE) {
+    confidence *= 0.75;
+  }
 
   confidence = Math.min(
     Math.max(confidence, 0),
     95
   );
 
+  // Strong evidence
   if (
     overallRate >= 15 &&
     recent20Rate >= 15 &&
-    recent10Rate >= 10
+    recent10Rate >= 20
   ) {
     return {
       title: "STRONG MATCH",
       detail:
-        `Digit ${selectedDigit} is showing consistently elevated frequency`,
+        `Digit ${selectedDigit} has strong overall and recent frequency`,
       confidence,
       className: "text-green-400",
     };
   }
 
+  // Moderate evidence
   if (
     overallRate >= 12 &&
-    recent20Rate >= 12
+    recent20Rate >= 10 &&
+    recent10Rate >= 10
   ) {
     return {
-      title: "MODERATE MATCH",
+      title: "MATCH",
       detail:
-        `Digit ${selectedDigit} is above the 10% baseline`,
+        `Digit ${selectedDigit} is showing elevated frequency`,
       confidence,
       className: "text-green-300",
     };
   }
 
+  // Mixed evidence
   if (
-    overallRate <= 5 &&
-    recent20Rate <= 5
+    overallRate >= 10 &&
+    confidence >= 10 &&
+    (recent20Rate >= 10 || recent10Rate >= 10)
   ) {
     return {
-      title: "LOW FREQUENCY",
+      title: "WATCH",
       detail:
-        `Digit ${selectedDigit} is below the 10% baseline`,
+        `Digit ${selectedDigit} is ranked well but evidence is mixed`,
       confidence,
-      className: "text-orange-400",
+      className: "text-yellow-300",
     };
   }
 
+  // Weak or insufficient evidence
   return {
     title: "NO CLEAR EDGE",
     detail:
-      `Digit ${selectedDigit} is near the 10% baseline`,
+      `Digit ${selectedDigit} does not meet the minimum match thresholds`,
     confidence,
     className: "text-yellow-400",
   };
