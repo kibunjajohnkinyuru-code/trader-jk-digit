@@ -380,46 +380,7 @@ const topSignal = useMemo(() => {
     className: "text-yellow-400",
   };
 }, [history.length, topCandidate]);
-  const topCandidate = matchCandidates[0];
-
-const topSignal = useMemo(() => {
-  if (history.length < 100 || !topCandidate) {
-    return {
-      title: "COLLECTING DATA",
-      detail: "Collecting 100 digits before ranking",
-      className: "text-yellow-400",
-    };
-  }
-
-  if (
-    topCandidate.overallRate >= 15 &&
-    topCandidate.recent20Rate >= 15 &&
-    topCandidate.recent10Rate >= 15
-  ) {
-    return {
-      title: "STRONG MATCH CANDIDATE",
-      detail: `Digit ${topCandidate.digit} has strong overall and recent frequency`,
-      className: "text-green-400",
-    };
-  }
-
-  if (
-    topCandidate.overallRate >= 12 &&
-    topCandidate.recent20Rate >= 10
-  ) {
-    return {
-      title: "MATCH CANDIDATE",
-      detail: `Digit ${topCandidate.digit} is showing elevated frequency`,
-      className: "text-green-300",
-    };
-  }
-
-  return {
-    title: "WEAK EDGE",
-    detail: `Digit ${topCandidate.digit} has limited statistical support`,
-    className: "text-yellow-400",
-  };
-}, [history.length, topCandidate]);
+  
   const resetAnalysis = () => {
     setHistory([]);
     setPrice(null);
