@@ -298,21 +298,47 @@ export default function Home() {
         (recent20Count / recent20.length) * 100;
 
       /*
-       * Match score:
-       * - Overall frequency is the main component.
-       * - Recent 20 confirms current activity.
-       * - Recent 10 gives extra weight to very recent activity.
+       * Conservative Match Strength
        *
-       * This is a ranking score, NOT a prediction.
+       * This is a ranking score only.
+       * It is NOT the probability of the next digit.
+       *
+       * Overall frequency = 50%
+       * Last 20            = 30%
+       * Last 10            = 20%
+       *
+       * A baseline deviation bonus rewards
+       * digits that are actually above 10%.
        */
-      let strength =
+
+      const baseScore =
         overallRate * 0.5 +
         recent20Rate * 0.3 +
         recent10Rate * 0.2;
 
+      const deviation =
+        Math.max(overallRate - BASELINE, 0);
+
+      const deviationBonus =
+        Math.min(deviation * 0.25, 5);
+
+      let strength =
+        baseScore * 0.85 +
+        deviationBonus;
+
       /*
-       * Do not allow a digit with extremely
-       * low overall frequency to rank too highly.
+       * Conservative penalty:
+       * A digit at or below the 10% baseline
+       * should not receive a strong match score
+       * merely because of a short recent streak.
+       */
+      if (overallRate <= BASELINE) {
+        strength *= 0.75;
+      }
+
+      /*
+       * Prevent extremely low-frequency digits
+       * from ranking too high.
        */
       if (overallRate < 5) {
         strength *= 0.5;
@@ -320,7 +346,7 @@ export default function Home() {
 
       strength = Math.min(
         Math.max(strength, 0),
-        100
+        95
       );
 
       return {
@@ -337,9 +363,15 @@ export default function Home() {
         return b.strength - a.strength;
       }
 
-      return b.overallRate - a.overallRate;
+      if (b.overallRate !== a.overallRate) {
+        return b.overallRate - a.overallRate;
+      }
+
+      return b.recent20Rate - a.recent20Rate;
     });
 }, [history, counts]);
+
+const topCandidate = matchCandidates[0];
   const topCandidate = matchCandidates[0];
 
 const topSignal = useMemo(() => {
