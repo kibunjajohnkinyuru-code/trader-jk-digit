@@ -273,14 +273,15 @@ export default function Home() {
     return [];
   }
 
+  const recent10 = history.slice(-10);
+  const recent20 = history.slice(-20);
+
   return digits
     .map((digit) => {
       const overallCount = counts[digit];
+
       const overallRate =
         (overallCount / history.length) * 100;
-
-      const recent10 = history.slice(-10);
-      const recent20 = history.slice(-20);
 
       const recent10Count = recent10.filter(
         (value) => value === digit
@@ -296,24 +297,30 @@ export default function Home() {
       const recent20Rate =
         (recent20Count / recent20.length) * 100;
 
-      const overallDeviation =
-        Math.abs(overallRate - BASELINE);
-
-      const recent20Deviation =
-        Math.abs(recent20Rate - BASELINE);
-
-      const recent10Deviation =
-        Math.abs(recent10Rate - BASELINE);
-
+      /*
+       * Match score:
+       * - Overall frequency is the main component.
+       * - Recent 20 confirms current activity.
+       * - Recent 10 gives extra weight to very recent activity.
+       *
+       * This is a ranking score, NOT a prediction.
+       */
       let strength =
-        40 +
-        overallDeviation * 2 +
-        recent20Deviation * 1.5 +
-        recent10Deviation;
+        overallRate * 0.5 +
+        recent20Rate * 0.3 +
+        recent10Rate * 0.2;
+
+      /*
+       * Do not allow a digit with extremely
+       * low overall frequency to rank too highly.
+       */
+      if (overallRate < 5) {
+        strength *= 0.5;
+      }
 
       strength = Math.min(
         Math.max(strength, 0),
-        95
+        100
       );
 
       return {
@@ -325,7 +332,13 @@ export default function Home() {
         strength,
       };
     })
-    .sort((a, b) => b.strength - a.strength);
+    .sort((a, b) => {
+      if (b.strength !== a.strength) {
+        return b.strength - a.strength;
+      }
+
+      return b.overallRate - a.overallRate;
+    });
 }, [history, counts]);
   const resetAnalysis = () => {
     setHistory([]);
