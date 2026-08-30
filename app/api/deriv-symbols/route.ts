@@ -6,8 +6,8 @@ export const runtime = "nodejs";
 export async function GET() {
   return new Promise<NextResponse>((resolve) => {
     const ws = new WebSocket(
-  "wss://api.derivws.com/trading/v1/options/ws/public"
-);
+      "wss://ws.binaryws.com/websockets/v3"
+    );
 
     const timeout = setTimeout(() => {
       ws.close();
@@ -27,19 +27,19 @@ export async function GET() {
     ws.on("open", () => {
       ws.send(
         JSON.stringify({
-          active_symbols: "brief",
+          ticks: "1HZ100V",
+          subscribe: 1,
           req_id: 1,
         })
       );
     });
 
     ws.on("message", (data: RawData) => {
-      clearTimeout(timeout);
-
       try {
         const msg = JSON.parse(data.toString());
 
         if (msg.error) {
+          clearTimeout(timeout);
           ws.close();
 
           resolve(
@@ -56,26 +56,12 @@ export async function GET() {
           return;
         }
 
-        if (msg.msg_type === "active_symbols") {
-          const symbols = (msg.active_symbols || []).map(
-            (item: any) => ({
-              symbol:
-                item.underlying_symbol ??
-                item.symbol ??
-                null,
+        if (msg.msg_type === "tick" && msg.tick) {
+          clearTimeout(timeout);
 
-              name:
-                item.underlying_symbol_name ??
-                item.display_name ??
-                null,
-
-              type:
-                item.underlying_symbol_type ??
-                item.symbol_type ??
-                null,
-
-              market: item.market ?? null,
-            })
+          const quote = Number(msg.tick.quote);
+          const digit = Number(
+            String(msg.tick.quote).replace(".", "").slice(-1)
           );
 
           ws.close();
@@ -84,24 +70,18 @@ export async function GET() {
             NextResponse.json({
               ok: true,
               feed: "READY",
-              count: symbols.length,
-              symbols,
+              symbol: msg.tick.symbol,
+              quote,
+              epoch: msg.tick.epoch,
+              pip_size: msg.tick.pip_size,
+              last_digit: digit,
             })
           );
 
           return;
         }
-
-        ws.close();
-
-        resolve(
-          NextResponse.json({
-            ok: true,
-            feed: "NO_SYMBOLS",
-            msg_type: msg.msg_type ?? null,
-          })
-        );
       } catch {
+        clearTimeout(timeout);
         ws.close();
 
         resolve(
@@ -117,7 +97,7 @@ export async function GET() {
       }
     });
 
-        ws.on("error", (error: Error) => {
+    ws.on("error", (error: Error) => {
       clearTimeout(timeout);
 
       resolve(
