@@ -380,6 +380,7 @@ export default function Home() {
       return b.recent20Rate - a.recent20Rate;
     });
 }, [history, counts]);
+  const topCandidate = matchCandidates[0];
 
 const topSignal = useMemo(() => {
   if (history.length < 100 || !topCandidate) {
