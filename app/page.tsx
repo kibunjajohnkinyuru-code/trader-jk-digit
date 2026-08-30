@@ -174,33 +174,36 @@ export default function Home() {
   }
 
   const recent10 = history.slice(-10);
+  const recent20 = history.slice(-20);
 
   const recent10Count = recent10.filter(
+    (digit) => digit === selectedDigit
+  ).length;
+
+  const recent20Count = recent20.filter(
     (digit) => digit === selectedDigit
   ).length;
 
   const recent10Rate =
     (recent10Count / recent10.length) * 100;
 
-  const recent20Rate = recentTargetRate;
+  const recent20Rate =
+    (recent20Count / recent20.length) * 100;
 
   const overallRate = matchRate;
 
-  const overallDeviation = Math.abs(
-    overallRate - BASELINE
-  );
+  const overallDeviation =
+    Math.abs(overallRate - BASELINE);
 
-  const recent20Deviation = Math.abs(
-    recent20Rate - BASELINE
-  );
+  const recent20Deviation =
+    Math.abs(recent20Rate - BASELINE);
 
-  const recent10Deviation = Math.abs(
-    recent10Rate - BASELINE
-  );
+  const recent10Deviation =
+    Math.abs(recent10Rate - BASELINE);
 
   /*
-   * This is a statistical strength score.
-   * It is NOT a prediction probability.
+   * Signal strength only.
+   * This is NOT the probability of the next digit.
    */
   let confidence =
     40 +
@@ -219,9 +222,9 @@ export default function Home() {
     recent10Rate >= 10
   ) {
     return {
-      title: "STRONG WATCH",
+      title: "STRONG MATCH",
       detail:
-        "Target frequency is consistently above the 10% baseline",
+        `Digit ${selectedDigit} is showing consistently elevated frequency`,
       confidence,
       className: "text-green-400",
     };
@@ -232,11 +235,11 @@ export default function Home() {
     recent20Rate >= 12
   ) {
     return {
-      title: "WATCH",
+      title: "MODERATE MATCH",
       detail:
-        "Target frequency is above baseline across recent samples",
+        `Digit ${selectedDigit} is above the 10% baseline`,
       confidence,
-      className: "text-green-400",
+      className: "text-green-300",
     };
   }
 
@@ -247,7 +250,7 @@ export default function Home() {
     return {
       title: "LOW FREQUENCY",
       detail:
-        "Target frequency is substantially below baseline",
+        `Digit ${selectedDigit} is below the 10% baseline`,
       confidence,
       className: "text-orange-400",
     };
@@ -256,14 +259,13 @@ export default function Home() {
   return {
     title: "NO CLEAR EDGE",
     detail:
-      "Recent and overall frequency do not show a strong statistical difference",
+      `Digit ${selectedDigit} is near the 10% baseline`,
     confidence,
     className: "text-yellow-400",
   };
 }, [
   history,
   selectedDigit,
-  recentTargetRate,
   matchRate,
 ]);
   const resetAnalysis = () => {
