@@ -202,21 +202,46 @@ export default function Home() {
    * This is a ranking/analysis score only.
    * It is NOT the probability of the next digit.
    */
-  let confidence =
-    overallRate * 0.50 +
-    recent20Rate * 0.25 +
-    recent10Rate * 0.10 +
-    overallDeviation * 0.15;
+  /*
+ * Statistical confidence measures how consistent
+ * the observed sample is across different windows.
+ *
+ * This is NOT the probability of the next digit.
+ */
+const overallEvidence =
+  Math.min(overallRate / 15, 1) * 40;
 
-  if (overallRate < BASELINE) {
-    confidence *= 0.75;
-  }
+const recent20Evidence =
+  Math.min(recent20Rate / 20, 1) * 30;
 
-  confidence = Math.min(
-    Math.max(confidence, 0),
-    95
+const recent10Evidence =
+  Math.min(recent10Rate / 30, 1) * 20;
+
+const consistency =
+  Math.max(
+    0,
+    10 -
+      Math.abs(overallRate - recent20Rate) * 0.5 -
+      Math.abs(recent20Rate - recent10Rate) * 0.5
   );
 
+let confidence =
+  overallEvidence +
+  recent20Evidence +
+  recent10Evidence +
+  consistency;
+
+/*
+ * Penalize samples below the 10% baseline.
+ */
+if (overallRate < BASELINE) {
+  confidence *= 0.70;
+}
+
+confidence = Math.min(
+  Math.max(confidence, 0),
+  95
+);
   // Strong evidence
   if (
     overallRate >= 15 &&
