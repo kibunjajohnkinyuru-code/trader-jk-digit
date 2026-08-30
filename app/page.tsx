@@ -663,6 +663,101 @@ const topSignal = useMemo(() => {
           </div>
 
         </section>
+        {/* TOP MATCH SIGNAL */}
+<section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
+
+  <h2 className="font-semibold mb-4">
+    Top Match Signal
+  </h2>
+
+  {history.length < 100 || !topCandidate ? (
+    <div>
+      <p className="text-2xl font-bold text-yellow-400">
+        COLLECTING DATA
+      </p>
+
+      <p className="text-sm text-gray-400 mt-2">
+        Collecting 100 digits before ranking
+      </p>
+    </div>
+  ) : (
+    <div>
+
+      <div className="flex justify-between items-center">
+
+        <div>
+          <p className="text-xs text-gray-500">
+            TOP CANDIDATE
+          </p>
+
+          <p className="text-5xl font-bold mt-1">
+            {topCandidate.digit}
+          </p>
+        </div>
+
+        <div className="text-right">
+          <p className="text-xs text-gray-500">
+            MATCH STRENGTH
+          </p>
+
+          <p className={`text-4xl font-bold ${topSignal.className}`}>
+            {topCandidate.strength.toFixed(0)}%
+          </p>
+        </div>
+
+      </div>
+
+      <p className={`text-xl font-bold mt-4 ${topSignal.className}`}>
+        {topSignal.title}
+      </p>
+
+      <p className="text-sm text-gray-400 mt-2">
+        {topSignal.detail}
+      </p>
+
+      <div className="grid grid-cols-3 gap-2 mt-4 text-center">
+
+        <div className="rounded-lg bg-gray-900 p-3">
+          <p className="text-xs text-gray-500">
+            100 TICKS
+          </p>
+
+          <p className="font-bold mt-1">
+            {topCandidate.overallRate.toFixed(1)}%
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-gray-900 p-3">
+          <p className="text-xs text-gray-500">
+            LAST 20
+          </p>
+
+          <p className="font-bold mt-1">
+            {topCandidate.recent20Rate.toFixed(1)}%
+          </p>
+        </div>
+
+        <div className="rounded-lg bg-gray-900 p-3">
+          <p className="text-xs text-gray-500">
+            LAST 10
+          </p>
+
+          <p className="font-bold mt-1">
+            {topCandidate.recent10Rate.toFixed(1)}%
+          </p>
+        </div>
+
+      </div>
+
+    </div>
+  )}
+
+  <p className="text-xs text-gray-600 mt-4">
+    This is a statistical ranking of observed digits,
+    not a prediction or probability of the next digit.
+  </p>
+
+</section>
   {/* MATCH SCANNER */}
 <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
