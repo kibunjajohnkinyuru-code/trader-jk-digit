@@ -297,56 +297,63 @@ export default function Home() {
       const recent20Rate =
         (recent20Count / recent20.length) * 100;
 
+      // Distance from the 10% baseline.
+      const overallDeviation =
+        Math.abs(overallRate - BASELINE);
+
+      const recent20Deviation =
+        Math.abs(recent20Rate - BASELINE);
+
+      const recent10Deviation =
+        Math.abs(recent10Rate - BASELINE);
+
       /*
-       * Conservative Match Strength
+       * Conservative ranking:
        *
-       * This is a ranking score only.
+       * 50% overall frequency
+       * 25% last 20
+       * 10% last 10
+       * 15% baseline deviation
+       *
+       * This is a ranking strength only.
        * It is NOT the probability of the next digit.
-       *
-       * Overall frequency = 50%
-       * Last 20            = 30%
-       * Last 10            = 20%
-       *
-       * A baseline deviation bonus rewards
-       * digits that are actually above 10%.
        */
-
-      const baseScore =
-        overallRate * 0.5 +
-        recent20Rate * 0.3 +
-        recent10Rate * 0.2;
-
-      const deviation =
-        Math.max(overallRate - BASELINE, 0);
-
-      const deviationBonus =
-        Math.min(deviation * 0.25, 5);
-
       let strength =
-        baseScore * 0.85 +
-        deviationBonus;
+        overallRate * 0.50 +
+        recent20Rate * 0.25 +
+        recent10Rate * 0.10 +
+        overallDeviation * 0.15;
 
       /*
-       * Conservative penalty:
-       * A digit at or below the 10% baseline
-       * should not receive a strong match score
-       * merely because of a short recent streak.
+       * Penalize digits that are below
+       * the 10% baseline overall.
        */
-      if (overallRate <= BASELINE) {
+      if (overallRate < BASELINE) {
         strength *= 0.75;
       }
 
       /*
-       * Prevent extremely low-frequency digits
-       * from ranking too high.
+       * Prevent a short-term spike from
+       * dominating the ranking.
+       */
+      if (
+        recent10Rate >= 30 &&
+        overallRate < 12
+      ) {
+        strength *= 0.80;
+      }
+
+      /*
+       * Require reasonable overall support
+       * before allowing a high ranking.
        */
       if (overallRate < 5) {
-        strength *= 0.5;
+        strength *= 0.50;
       }
 
       strength = Math.min(
         Math.max(strength, 0),
-        95
+        100
       );
 
       return {
@@ -356,6 +363,9 @@ export default function Home() {
         recent10Rate,
         recent20Rate,
         strength,
+        overallDeviation,
+        recent20Deviation,
+        recent10Deviation,
       };
     })
     .sort((a, b) => {
@@ -370,7 +380,6 @@ export default function Home() {
       return b.recent20Rate - a.recent20Rate;
     });
 }, [history, counts]);
-  const topCandidate = matchCandidates[0];
 
 const topSignal = useMemo(() => {
   if (history.length < 100 || !topCandidate) {
