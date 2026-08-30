@@ -4,11 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 
 const digits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 const MAX_HISTORY = 100;
+const BASELINE = 10;
 
 export default function Home() {
   const [selectedDigit, setSelectedDigit] = useState(5);
-
   const [market] = useState("1HZ100V");
+
   const [price, setPrice] = useState<string | null>(null);
   const [lastDigit, setLastDigit] = useState<number | null>(null);
 
@@ -45,6 +46,14 @@ export default function Home() {
         }
 
         const digit = Number(data.last_digit);
+
+        if (!Number.isInteger(digit) || digit < 0 || digit > 9) {
+          setConnection("Error");
+          setStatus("Invalid digit");
+
+          timer = setTimeout(getTick, 3000);
+          return;
+        }
 
         setPrice(String(data.quote));
         setLastDigit(digit);
@@ -97,41 +106,108 @@ export default function Home() {
 
   const matchPercentage =
     history.length > 0
-      ? ((match / history.length) * 100).toFixed(1)
-      : "0.0";
+      ? (match / history.length) * 100
+      : 0;
 
   const nonMatchPercentage =
     history.length > 0
-      ? ((nonMatch / history.length) * 100).toFixed(1)
-      : "0.0";
+      ? (nonMatch / history.length) * 100
+      : 0;
 
-  const mostFrequentDigit = useMemo(() => {
-    if (history.length === 0) return null;
+  const selectedDifference =
+    matchPercentage - BASELINE;
 
-    return digits.reduce((best, digit) =>
-      counts[digit] > counts[best] ? digit : best
-    );
-  }, [counts, history.length]);
+  const ranking = useMemo(() => {
+    return [...digits].sort((a, b) => {
+      if (counts[b] !== counts[a]) {
+        return counts[b] - counts[a];
+      }
+
+      return a - b;
+    });
+  }, [counts]);
+
+  const mostFrequentDigit =
+    history.length > 0 ? ranking[0] : null;
 
   const leastFrequentDigit = useMemo(() => {
     if (history.length === 0) return null;
 
-    return digits.reduce((best, digit) =>
-      counts[digit] < counts[best] ? digit : best
-    );
+    return [...digits].sort((a, b) => {
+      if (counts[a] !== counts[b]) {
+        return counts[a] - counts[b];
+      }
+
+      return a - b;
+    })[0];
   }, [counts, history.length]);
 
-  const analysis =
-    history.length < 20
-      ? "Collecting data"
-      : Number(matchPercentage) > 15
-      ? "Above recent average"
-      : Number(matchPercentage) < 5
-      ? "Below recent average"
-      : "Normal range";
+  const selectedStreak = useMemo(() => {
+    let streak = 0;
+
+    for (let i = history.length - 1; i >= 0; i--) {
+      if (history[i] === selectedDigit) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  }, [history, selectedDigit]);
+
+  const recentTargetCount = useMemo(() => {
+    const recent = history.slice(-20);
+
+    return recent.filter(
+      (digit) => digit === selectedDigit
+    ).length;
+  }, [history, selectedDigit]);
+
+  const recentTargetRate =
+    history.length > 0
+      ? (recentTargetCount /
+          Math.min(history.length, 20)) *
+        100
+      : 0;
+
+  const signal = useMemo(() => {
+    if (history.length < 100) {
+      return {
+        title: "COLLECTING DATA",
+        detail: `${history.length}/100 digits`,
+        className: "text-yellow-400",
+      };
+    }
+
+    if (matchPercentage >= 15) {
+      return {
+        title: "WATCH",
+        detail: "Target is above the 10% baseline",
+        className: "text-green-400",
+      };
+    }
+
+    if (matchPercentage <= 5) {
+      return {
+        title: "LOW FREQUENCY",
+        detail: "Target is below the 10% baseline",
+        className: "text-orange-400",
+      };
+    }
+
+    return {
+      title: "NO CLEAR EDGE",
+      detail: "Target is near the 10% baseline",
+      className: "text-yellow-400",
+    };
+  }, [history.length, matchPercentage]);
 
   const resetAnalysis = () => {
     setHistory([]);
+    setLastDigit(null);
+    setPrice(null);
+    setStatus("Waiting for ticks");
   };
 
   return (
@@ -148,7 +224,7 @@ export default function Home() {
           </p>
         </header>
 
-        {/* MARKET / CONNECTION */}
+        {/* MARKET */}
         <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
           <div className="flex justify-between gap-4">
 
@@ -167,6 +243,7 @@ export default function Home() {
             </div>
 
             <div className="text-right">
+
               <p className="text-xs text-gray-500">
                 CONNECTION
               </p>
@@ -182,12 +259,13 @@ export default function Home() {
               >
                 ● {connection}
               </p>
+
             </div>
 
           </div>
         </section>
 
-        {/* CURRENT PRICE */}
+        {/* PRICE */}
         <section className="rounded-2xl border border-gray-800 bg-gray-950 p-6 text-center mb-4">
 
           <p className="text-xs text-gray-500">
@@ -216,11 +294,11 @@ export default function Home() {
 
         </section>
 
-        {/* DIGIT SELECTOR */}
+        {/* TARGET DIGIT */}
         <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
           <h2 className="font-semibold mb-4">
-            Digit Analysis
+            Select Target Digit
           </h2>
 
           <div className="grid grid-cols-5 gap-2">
@@ -245,18 +323,18 @@ export default function Home() {
 
         </section>
 
-        {/* 0-9 FREQUENCY */}
+        {/* SAMPLE */}
         <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
-          <div className="flex justify-between items-center mb-4">
+          <div className="flex justify-between items-center">
 
             <div>
-              <h2 className="font-semibold">
-                Digit Frequency
-              </h2>
+              <p className="text-xs text-gray-500">
+                SAMPLE
+              </p>
 
-              <p className="text-xs text-gray-500 mt-1">
-                Latest {history.length} digits
+              <p className="text-2xl font-bold">
+                {history.length}/100
               </p>
             </div>
 
@@ -269,26 +347,54 @@ export default function Home() {
 
           </div>
 
+          <div className="mt-4 h-2 rounded-full bg-gray-800 overflow-hidden">
+
+            <div
+              className="h-full bg-white"
+              style={{
+                width: `${history.length}%`,
+              }}
+            />
+
+          </div>
+
+        </section>
+
+        {/* FREQUENCY */}
+        <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
+
+          <h2 className="font-semibold mb-4">
+            100-Digit Frequency
+          </h2>
+
           <div className="space-y-2">
 
-            {digits.map((digit) => {
+            {ranking.map((digit, index) => {
 
               const count = counts[digit];
 
               const percentage =
                 history.length > 0
-                  ? ((count / history.length) * 100).toFixed(1)
-                  : "0.0";
+                  ? (count / history.length) * 100
+                  : 0;
 
               return (
                 <div
                   key={digit}
-                  className="flex items-center gap-3"
+                  className={`flex items-center gap-2 rounded-lg p-2 ${
+                    digit === selectedDigit
+                      ? "bg-gray-800"
+                      : ""
+                  }`}
                 >
 
-                  <div className="w-6 font-bold">
+                  <span className="w-5 text-xs text-gray-500">
+                    {index + 1}
+                  </span>
+
+                  <span className="w-6 font-bold">
                     {digit}
-                  </div>
+                  </span>
 
                   <div className="flex-1 h-3 rounded-full bg-gray-800 overflow-hidden">
 
@@ -296,7 +402,7 @@ export default function Home() {
                       className="h-full bg-white"
                       style={{
                         width: `${Math.min(
-                          Number(percentage) * 5,
+                          percentage * 5,
                           100
                         )}%`,
                       }}
@@ -304,9 +410,9 @@ export default function Home() {
 
                   </div>
 
-                  <div className="w-16 text-right text-xs text-gray-400">
-                    {count} ({percentage}%)
-                  </div>
+                  <span className="w-16 text-right text-xs">
+                    {count} ({percentage.toFixed(1)}%)
+                  </span>
 
                 </div>
               );
@@ -316,38 +422,137 @@ export default function Home() {
 
         </section>
 
-        {/* MATCH ANALYSIS */}
+        {/* TARGET ANALYSIS */}
         <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
           <h2 className="font-semibold mb-4">
-            Match Analysis
+            Target Analysis
           </h2>
 
-          <div className="flex justify-between mb-5">
+          <div className="grid grid-cols-2 gap-3">
 
-            <div>
+            <div className="rounded-xl bg-gray-900 p-4">
               <p className="text-xs text-gray-500">
-                Selected target digit
+                TARGET
               </p>
 
-              <p className="text-4xl font-bold">
+              <p className="text-3xl font-bold">
                 {selectedDigit}
               </p>
             </div>
 
-            <div className="text-right">
-
+            <div className="rounded-xl bg-gray-900 p-4">
               <p className="text-xs text-gray-500">
-                ANALYSIS
+                FREQUENCY
               </p>
 
-              <p className="text-green-400">
-                {analysis}
+              <p className="text-3xl font-bold">
+                {match}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-gray-900 p-4">
+              <p className="text-xs text-gray-500">
+                MATCH RATE
+              </p>
+
+              <p className="text-2xl font-bold">
+                {matchPercentage.toFixed(1)}%
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-gray-900 p-4">
+              <p className="text-xs text-gray-500">
+                BASELINE
+              </p>
+
+              <p className="text-2xl font-bold">
+                {BASELINE}%
+              </p>
+            </div>
+
+          </div>
+
+          <div className="mt-3 rounded-xl bg-gray-900 p-4">
+
+            <p className="text-xs text-gray-500">
+              VS 10% BASELINE
+            </p>
+
+            <p className="text-xl font-bold">
+              {selectedDifference >= 0 ? "+" : ""}
+              {selectedDifference.toFixed(1)}%
+            </p>
+
+          </div>
+
+        </section>
+
+        {/* STREAK */}
+        <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
+
+          <h2 className="font-semibold mb-4">
+            Recent Pattern
+          </h2>
+
+          <div className="grid grid-cols-2 gap-3">
+
+            <div className="rounded-xl bg-gray-900 p-4">
+
+              <p className="text-xs text-gray-500">
+                CURRENT TARGET STREAK
+              </p>
+
+              <p className="text-3xl font-bold">
+                {selectedStreak}
+              </p>
+
+            </div>
+
+            <div className="rounded-xl bg-gray-900 p-4">
+
+              <p className="text-xs text-gray-500">
+                LAST 20 RATE
+              </p>
+
+              <p className="text-3xl font-bold">
+                {recentTargetRate.toFixed(1)}%
               </p>
 
             </div>
 
           </div>
+
+        </section>
+
+        {/* SIGNAL */}
+        <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
+
+          <h2 className="font-semibold mb-4">
+            Analysis Signal
+          </h2>
+
+          <p className={`text-2xl font-bold ${signal.className}`}>
+            {signal.title}
+          </p>
+
+          <p className="text-sm text-gray-400 mt-2">
+            {signal.detail}
+          </p>
+
+          <p className="text-xs text-gray-600 mt-4">
+            Statistical analysis only. This does not guarantee
+            the next digit.
+          </p>
+
+        </section>
+
+        {/* MATCH */}
+        <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
+
+          <h2 className="font-semibold mb-4">
+            Match Analysis
+          </h2>
 
           <div className="grid grid-cols-2 gap-3">
 
@@ -362,7 +567,7 @@ export default function Home() {
               </p>
 
               <p className="text-xs text-gray-400 mt-1">
-                {matchPercentage}%
+                {matchPercentage.toFixed(1)}%
               </p>
 
             </div>
@@ -378,44 +583,7 @@ export default function Home() {
               </p>
 
               <p className="text-xs text-gray-400 mt-1">
-                {nonMatchPercentage}%
-              </p>
-
-            </div>
-
-          </div>
-
-        </section>
-
-        {/* SUMMARY */}
-        <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
-
-          <h2 className="font-semibold mb-4">
-            Statistics
-          </h2>
-
-          <div className="grid grid-cols-2 gap-3">
-
-            <div className="rounded-xl bg-gray-900 p-4">
-
-              <p className="text-xs text-gray-500">
-                MOST FREQUENT
-              </p>
-
-              <p className="text-3xl font-bold">
-                {mostFrequentDigit ?? "—"}
-              </p>
-
-            </div>
-
-            <div className="rounded-xl bg-gray-900 p-4">
-
-              <p className="text-xs text-gray-500">
-                LEAST FREQUENT
-              </p>
-
-              <p className="text-3xl font-bold">
-                {leastFrequentDigit ?? "—"}
+                {nonMatchPercentage.toFixed(1)}%
               </p>
 
             </div>
@@ -462,4 +630,4 @@ export default function Home() {
       </div>
     </main>
   );
-    }
+      }
