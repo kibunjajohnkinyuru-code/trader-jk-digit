@@ -193,10 +193,13 @@ export default function Home() {
   const overallRate = matchRate;
 
   const overallDeviation =
-    Math.abs(overallRate - BASELINE);
+  Math.abs(overallRate - BASELINE);
 
-    Math.abs(recent20Rate - BASELINE);
+const recent20Deviation =
+  Math.abs(recent20Rate - BASELINE);
 
+const recent10Deviation =
+  Math.abs(recent10Rate - BASELINE);
   /*
    * Conservative statistical strength.
    * This is a ranking/analysis score only.
