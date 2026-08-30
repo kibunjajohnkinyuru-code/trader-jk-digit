@@ -351,32 +351,45 @@ const topSignal = useMemo(() => {
     };
   }
 
+  const { overallRate, recent20Rate, recent10Rate } =
+    topCandidate;
+
+  // Strong evidence:
+  // overall >= 15%
+  // last 20 >= 15%
+  // last 10 >= 20%
   if (
-    topCandidate.overallRate >= 15 &&
-    topCandidate.recent20Rate >= 15 &&
-    topCandidate.recent10Rate >= 15
+    overallRate >= 15 &&
+    recent20Rate >= 15 &&
+    recent10Rate >= 20
   ) {
     return {
-      title: "STRONG MATCH CANDIDATE",
+      title: "STRONG MATCH",
       detail: `Digit ${topCandidate.digit} has strong overall and recent frequency`,
       className: "text-green-400",
     };
   }
 
+  // Moderate evidence:
+  // overall >= 12%
+  // last 20 >= 10%
+  // last 10 >= 10%
   if (
-    topCandidate.overallRate >= 12 &&
-    topCandidate.recent20Rate >= 10
+    overallRate >= 12 &&
+    recent20Rate >= 10 &&
+    recent10Rate >= 10
   ) {
     return {
-      title: "MATCH CANDIDATE",
+      title: "MATCH",
       detail: `Digit ${topCandidate.digit} is showing elevated frequency`,
       className: "text-green-300",
     };
   }
 
+  // Otherwise there is not enough evidence.
   return {
-    title: "WEAK EDGE",
-    detail: `Digit ${topCandidate.digit} has limited statistical support`,
+    title: "NO CLEAR EDGE",
+    detail: `Digit ${topCandidate.digit} does not meet the minimum match thresholds`,
     className: "text-yellow-400",
   };
 }, [history.length, topCandidate]);
