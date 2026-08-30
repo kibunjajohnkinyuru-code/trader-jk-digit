@@ -3,10 +3,14 @@ import WebSocket, { RawData } from "ws";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+
+  const symbol = searchParams.get("symbol") || "1HZ100V";
+
   return new Promise<NextResponse>((resolve) => {
     const ws = new WebSocket(
-      "wss://ws.binaryws.com/websockets/v3"
+      "wss://api.derivws.com/trading/v1/options/ws/public"
     );
 
     const timeout = setTimeout(() => {
@@ -27,7 +31,7 @@ export async function GET() {
     ws.on("open", () => {
       ws.send(
         JSON.stringify({
-          ticks: "1HZ100V",
+          ticks: symbol,
           subscribe: 1,
           req_id: 1,
         })
@@ -60,7 +64,10 @@ export async function GET() {
           clearTimeout(timeout);
 
           const quote = String(msg.tick.quote);
-          const lastDigit = Number(quote.slice(-1));
+
+          const lastDigit = Number(
+            quote.replace(".", "").slice(-1)
+          );
 
           ws.close();
 
@@ -110,5 +117,5 @@ export async function GET() {
         )
       );
     });
-  }); 
- }
+  });
+            }
