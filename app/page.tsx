@@ -132,22 +132,6 @@ useEffect(() => {
 
   const hit = actualDigit === validationCandidate;
 
-  setValidationResults((previous) => ({
-    tested: previous.tested + 1,
-    hits: previous.hits + (hit ? 1 : 0),
-    misses: previous.misses + (hit ? 0 : 1),
-  }));
-
-  setValidationStatus(hit ? "HIT" : "MISS");
-  setValidationCandidate(null);
-  setValidationStartLength(null);
-}, [
-  history,
-  validationStatus,
-  validationCandidate,
-  validationStartLength,
-]);
-
 const counts = useMemo(() => {
   const result = Array(10).fill(0) as number[];
 
@@ -200,62 +184,63 @@ const counts = useMemo(() => {
 
       setHistory((previous) => {
   const nextHistory = [...previous, digit].slice(-MAX_HISTORY);
-
-  /*
-   * NEXT-TICK VALIDATION
-   *
-   * Test the candidate selected from the previous
-   * 100-tick sample against the newly received digit.
-   *
-   * This measures historical performance only.
-   * It does NOT predict the next digit.
-   */
+/*
+ * NEXT-TICK VALIDATION
+ *
+ * Tests the previously selected candidate
+ * against the next received digit.
+ *
+ * This is historical validation only.
+ * It is NOT a prediction or probability.
+ */
+useEffect(() => {
   if (
-    validationStatus === "WAITING" &&
-    validationCandidate !== null &&
-    validationStartLength !== null &&
-    previous.length >= validationStartLength + 1
+    validationStatus !== "WAITING" ||
+    validationCandidate === null ||
+    validationStartLength === null
   ) {
-    const hit = digit === validationCandidate;
-
-    setValidationResults((results) => ({
-      tested: results.tested + 1,
-      hits: results.hits + (hit ? 1 : 0),
-      misses: results.misses + (hit ? 0 : 1),
-    }));
-
-    setValidationStatus(hit ? "HIT" : "MISS");
-    setValidationCandidate(null);
-    setValidationStartLength(null);
+    return;
   }
 
-  return nextHistory;
-});
+  if (history.length <= validationStartLength) {
+    return;
+  }
 
-    if (active) {
-      timer = setTimeout(getTick, 1000);
+  const actualDigit = history[history.length - 1];
+
+  const hit = actualDigit === validationCandidate;
+
+  setValidationResults((previous) => ({
+    tested: previous.tested + 1,
+    hits: previous.hits + (hit ? 1 : 0),
+    misses: previous.misses + (hit ? 0 : 1),
+  }));
+
+  setValidationStatus(hit ? "HIT" : "MISS");
+  setValidationCandidate(null);
+  setValidationStartLength(null);
+}, [
+  history,
+  validationStatus,
+  validationCandidate,
+  validationStartLength,
+]);
+
+
+/*
+ * DIGIT FREQUENCY COUNTS
+ */
+const counts = useMemo(() => {
+  const result = Array(10).fill(0) as number[];
+
+  for (const digit of history) {
+    if (digit >= 0 && digit <= 9) {
+      result[digit]++;
     }
-  };
+  }
 
-  getTick();
-
-  return () => {
-    active = false;
-    clearTimeout(timer);
-  };
-}, [market]);
-  const counts = useMemo(() => {
-    const result = Array(10).fill(0) as number[];
-
-    for (const digit of history) {
-      if (digit >= 0 && digit <= 9) {
-        result[digit]++;
-      }
-    }
-
-    return result;
-  }, [history]);
-
+  return result;
+}, [history]);
   const targetCount = counts[selectedDigit];
 
   const nonMatch = history.length - targetCount;
