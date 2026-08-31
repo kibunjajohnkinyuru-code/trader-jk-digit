@@ -1467,4 +1467,4 @@ const resetAnalysis = () => {
       </div>
     </main>
   );
-      }
+ }
