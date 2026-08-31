@@ -31,8 +31,6 @@ const [validationResults, setValidationResults] = useState({
   hits: 0,
   misses: 0,
 });
-
-
 /*
  * LIVE DERIV TICK FEED
  *
@@ -82,13 +80,13 @@ useEffect(() => {
       setConnection("Connected");
       setStatus("Live");
 
-      setHistory((previous) => {
-        return [
-          ...previous,
-          digit,
-        ].slice(-MAX_HISTORY);
-      });
+      setHistory((previous) =>
+        [...previous, digit].slice(-MAX_HISTORY)
+      );
 
+      if (active) {
+        timer = setTimeout(getTick, 1000);
+      }
     } catch {
       if (!active) return;
 
@@ -96,11 +94,6 @@ useEffect(() => {
       setStatus("Connection failed");
 
       timer = setTimeout(getTick, 3000);
-      return;
-    }
-
-    if (active) {
-      timer = setTimeout(getTick, 1000);
     }
   };
 
@@ -116,10 +109,10 @@ useEffect(() => {
 /*
  * NEXT-TICK VALIDATION
  *
- * Tests a previously selected candidate
+ * Tests the previously selected candidate
  * against the next received digit.
  *
- * This measures historical performance only.
+ * This is historical validation only.
  * It is NOT a prediction or probability.
  */
 useEffect(() => {
@@ -135,39 +128,37 @@ useEffect(() => {
     return;
   }
 
-  const actualDigit =
-    history[history.length - 1];
+  const actualDigit = history[history.length - 1];
 
-  const hit =
-    actualDigit === validationCandidate;
+  const hit = actualDigit === validationCandidate;
 
-  if (hit) {
-    setValidationStatus("HIT");
+  setValidationResults((previous) => ({
+    tested: previous.tested + 1,
+    hits: previous.hits + (hit ? 1 : 0),
+    misses: previous.misses + (hit ? 0 : 1),
+  }));
 
-    setValidationResults((previous) => ({
-      tested: previous.tested + 1,
-      hits: previous.hits + 1,
-      misses: previous.misses,
-    }));
-  } else {
-    setValidationStatus("MISS");
-
-    setValidationResults((previous) => ({
-      tested: previous.tested + 1,
-      hits: previous.hits,
-      misses: previous.misses + 1,
-    }));
-  }
-
+  setValidationStatus(hit ? "HIT" : "MISS");
   setValidationCandidate(null);
   setValidationStartLength(null);
-
 }, [
   history,
   validationStatus,
   validationCandidate,
   validationStartLength,
 ]);
+
+const counts = useMemo(() => {
+  const result = Array(10).fill(0) as number[];
+
+  for (const digit of history) {
+    if (digit >= 0 && digit <= 9) {
+      result[digit]++;
+    }
+  }
+
+  return result;
+}, [history]);
 
   useEffect(() => {
   let active = true;
