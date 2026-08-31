@@ -19,9 +19,8 @@ const [history, setHistory] = useState<number[]>([]);
 const [validationCandidate, setValidationCandidate] =
   useState<number | null>(null);
 
-const [validationStatus, setValidationStatus] = useState<
-  "IDLE" | "WAITING" | "HIT" | "MISS"
->("IDLE");
+const [validationStatus, setValidationStatus] =
+  useState<"IDLE" | "WAITING" | "HIT" | "MISS">("IDLE");
 
 const [validationStartLength, setValidationStartLength] =
   useState<number | null>(null);
