@@ -1436,11 +1436,11 @@ const resetAnalysis = () => {
 
         </section>
 
-        <footer className="text-center text-xs text-gray-500 mt-6">
+       <footer className="text-center text-xs text-gray-500 mt-6">
           Trader JK • Analysis only • Not financial advice
         </footer>
 
       </div>
     </main>
   );
- }
+            }
