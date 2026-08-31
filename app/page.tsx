@@ -690,22 +690,6 @@ const topSignal = useMemo(() => {
   };
 }, [history.length, topCandidate]);
 
-// NEXT-TICK VALIDATION
-const [validationCandidate, setValidationCandidate] =
-  useState<number | null>(null);
-
-const [validationStatus, setValidationStatus] = useState<
-  "IDLE" | "WAITING" | "HIT" | "MISS"
->("IDLE");
-
-const [validationStartLength, setValidationStartLength] =
-  useState<number | null>(null);
-
-const [validationResults, setValidationResults] = useState({
-  tested: 0,
-  hits: 0,
-  misses: 0,
-});
 
 const startNextTickValidation = () => {
   if (history.length < 100 || !topCandidate) {
