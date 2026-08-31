@@ -482,14 +482,20 @@ const topSignal = useMemo(() => {
     strength,
   } = topCandidate;
 
-  // STRONG MATCH:
-  // Requires strong overall frequency,
-  // strong recent activity, and a strong ranking score.
+  /*
+   * STRONG MATCH
+   *
+   * Requires strong support across:
+   * - 100-tick sample
+   * - last 20 ticks
+   * - last 10 ticks
+   * - ranking strength
+   */
   if (
+    strength >= 22 &&
     overallRate >= 15 &&
     recent20Rate >= 15 &&
-    recent10Rate >= 20 &&
-    strength >= 18
+    recent10Rate >= 20
   ) {
     return {
       title: "STRONG MATCH",
@@ -499,14 +505,17 @@ const topSignal = useMemo(() => {
     };
   }
 
-  // MATCH:
-  // Requires elevated overall frequency
-  // and confirmation from recent activity.
+  /*
+   * MATCH
+   *
+   * Good overall support with
+   * reasonable recent confirmation.
+   */
   if (
+    strength >= 16 &&
     overallRate >= 12 &&
     recent20Rate >= 10 &&
-    recent10Rate >= 10 &&
-    strength >= 14
+    recent10Rate >= 10
   ) {
     return {
       title: "MATCH",
@@ -516,12 +525,15 @@ const topSignal = useMemo(() => {
     };
   }
 
-  // WATCH:
-  // Candidate is ranked well but evidence
-  // is not strong enough for a Match.
+  /*
+   * WATCH
+   *
+   * Candidate is interesting, but
+   * evidence is not strong enough.
+   */
   if (
-    overallRate >= 10 &&
     strength >= 10 &&
+    overallRate >= 10 &&
     (recent20Rate >= 10 || recent10Rate >= 10)
   ) {
     return {
@@ -532,8 +544,9 @@ const topSignal = useMemo(() => {
     };
   }
 
-  // NO CLEAR EDGE:
-  // Not enough statistical support.
+  /*
+   * NO CLEAR EDGE
+   */
   return {
     title: "NO CLEAR EDGE",
     detail:
