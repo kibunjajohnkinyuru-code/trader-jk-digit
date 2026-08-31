@@ -21,68 +21,173 @@ const [validation, setValidation] = useState({
   hits: 0,
 });
   useEffect(() => {
-    let active = true;
-    let timer: ReturnType<typeof setTimeout>;
+  let active = true;
+  let timer: ReturnType<typeof setTimeout>;
 
-    const getTick = async () => {
-      try {
-        setConnection("Connecting");
+  const getTick = async () => {
+    try {
+      setConnection("Connecting");
 
-        const response = await fetch(
-          `/api/deriv-tick?symbol=${encodeURIComponent(market)}`,
-          { cache: "no-store" }
-        );
+      const response = await fetch(
+        `/api/deriv-tick?symbol=${encodeURIComponent(market)}`,
+        { cache: "no-store" }
+      );
 
-        const data = await response.json();
+      const data = await response.json();
 
-        if (!active) return;
+      if (!active) return;
 
-        if (!response.ok || !data.ok) {
-          setConnection("Error");
-          setStatus("Feed error");
-          timer = setTimeout(getTick, 3000);
-          return;
-        }
-
-        const digit = Number(data.last_digit);
-
-        if (!Number.isInteger(digit) || digit < 0 || digit > 9) {
-          setConnection("Error");
-          setStatus("Invalid digit");
-          timer = setTimeout(getTick, 3000);
-          return;
-        }
-
-        setPrice(String(data.quote));
-        setLastDigit(digit);
-        setConnection("Connected");
-        setStatus("Live");
-
-        setHistory((previous) => {
-          return [...previous, digit].slice(-MAX_HISTORY);
-        });
-      } catch {
-        if (!active) return;
-
+      if (!response.ok || !data.ok) {
         setConnection("Error");
-        setStatus("Connection failed");
+        setStatus("Feed error");
         timer = setTimeout(getTick, 3000);
         return;
       }
 
-      if (active) {
-        timer = setTimeout(getTick, 1000);
+      const digit = Number(data.last_digit);
+
+      if (!Number.isInteger(digit) || digit < 0 || digit > 9) {
+        setConnection("Error");
+        setStatus("Invalid digit");
+        timer = setTimeout(getTick, 3000);
+        return;
       }
-    };
 
-    getTick();
+      setPrice(String(data.quote));
+      setLastDigit(digit);
+      setConnection("Connected");
+      setStatus("Live");
 
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [market]);
+      setHistory((previous) => {
+        /*
+         * NEXT-TICK VALIDATION
+         *
+         * The previous top candidate is tested
+         * against the newly received tick.
+         *
+         * This measures historical signal performance.
+         * It is NOT a prediction of the next digit.
+         */
+        setValidation((previousValidation) => {
+          if (previous.length < 100) {
+            return previousValidation;
+          }
 
+          const recent10 = previous.slice(-10);
+          const recent20 = previous.slice(-20);
+
+          const candidateScores = digits.map((candidate) => {
+            const overallCount = previous.filter(
+              (value) => value === candidate
+            ).length;
+
+            const overallRate =
+              (overallCount / previous.length) * 100;
+
+            const recent10Count = recent10.filter(
+              (value) => value === candidate
+            ).length;
+
+            const recent20Count = recent20.filter(
+              (value) => value === candidate
+            ).length;
+
+            const recent10Rate =
+              (recent10Count / recent10.length) * 100;
+
+            const recent20Rate =
+              (recent20Count / recent20.length) * 100;
+
+            let strength =
+              overallRate * 0.60 +
+              recent20Rate * 0.25 +
+              recent10Rate * 0.15;
+
+            if (
+              overallRate >= BASELINE &&
+              recent20Rate >= BASELINE &&
+              recent10Rate >= BASELINE
+            ) {
+              strength += 2;
+            }
+
+            if (overallRate < BASELINE) {
+              strength *= 0.75;
+            }
+
+            if (
+              recent10Rate >= 30 &&
+              overallRate < 12
+            ) {
+              strength *= 0.80;
+            }
+
+            if (overallRate < 5) {
+              strength *= 0.50;
+            }
+
+            return {
+              digit: candidate,
+              strength,
+              overallRate,
+              recent20Rate,
+              recent10Rate,
+            };
+          });
+
+          candidateScores.sort((a, b) => {
+            if (b.strength !== a.strength) {
+              return b.strength - a.strength;
+            }
+
+            if (b.overallRate !== a.overallRate) {
+              return b.overallRate - a.overallRate;
+            }
+
+            return b.recent20Rate - a.recent20Rate;
+          });
+
+          const previousTopCandidate =
+            candidateScores[0];
+
+          if (!previousTopCandidate) {
+            return previousValidation;
+          }
+
+          const hit =
+            digit === previousTopCandidate.digit;
+
+          return {
+            tested: previousValidation.tested + 1,
+            hits:
+              previousValidation.hits +
+              (hit ? 1 : 0),
+          };
+        });
+
+        return [...previous, digit].slice(-MAX_HISTORY);
+      });
+    } catch {
+      if (!active) return;
+
+      setConnection("Error");
+      setStatus("Connection failed");
+      timer = setTimeout(getTick, 3000);
+      return;
+    }
+
+    if (active) {
+      timer = setTimeout(getTick, 1000);
+    }
+  };
+
+  getTick();
+
+  return () => {
+    active = false;
+    clearTimeout(timer);
+  };
+}, [market]);
   const counts = useMemo(() => {
     const result = Array(10).fill(0) as number[];
 
