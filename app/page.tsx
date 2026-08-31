@@ -377,13 +377,25 @@ confidence = Math.min(
  * It is NOT the probability of the next digit.
  */
 
+/*
+ * Conservative Match Strength.
+ *
+ * 60% = overall 100-tick frequency
+ * 25% = last 20 ticks
+ * 15% = last 10 ticks
+ *
+ * This is a statistical ranking score only.
+ * It is NOT the probability of the next digit.
+ */
+
 let strength =
   overallRate * 0.60 +
   recent20Rate * 0.25 +
   recent10Rate * 0.15;
 
 /*
- * Reward consistency when all three windows
+ * Small consistency bonus.
+ * Only applied when all three windows
  * are at or above the 10% baseline.
  */
 if (
@@ -395,7 +407,7 @@ if (
 }
 
 /*
- * Penalize digits that are below baseline
+ * Penalize digits below the 10% baseline
  * in the full 100-tick sample.
  */
 if (overallRate < BASELINE) {
@@ -403,7 +415,7 @@ if (overallRate < BASELINE) {
 }
 
 /*
- * Prevent a very short-term spike from
+ * Prevent a short-term spike from
  * dominating the ranking.
  */
 if (
@@ -414,44 +426,20 @@ if (
 }
 
 /*
- * Very weak overall support gets a stronger penalty.
+ * Strong penalty for very weak
+ * overall support.
  */
 if (overallRate < 5) {
   strength *= 0.50;
 }
 
+/*
+ * Keep score between 0 and 100.
+ */
 strength = Math.min(
   Math.max(strength, 0),
   100
 );
-      /*
-       * Penalize digits that are below
-       * the 10% baseline overall.
-       */
-      /*
-       * Prevent a short-term spike from
-       * dominating the ranking.
-       */
-      if (
-        recent10Rate >= 30 &&
-        overallRate < 12
-      ) {
-        strength *= 0.80;
-      }
-
-      /*
-       * Require reasonable overall support
-       * before allowing a high ranking.
-       */
-      if (overallRate < 5) {
-        strength *= 0.50;
-      }
-
-      strength = Math.min(
-        Math.max(strength, 0),
-        100
-      );
-
       return {
         digit,
         overallCount,
