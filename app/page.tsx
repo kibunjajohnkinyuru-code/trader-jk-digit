@@ -69,122 +69,38 @@ const [validationResults, setValidationResults] = useState({
       setStatus("Live");
 
       setHistory((previous) => {
-        /*
-         * NEXT-TICK VALIDATION
-         *
-         * The previous top candidate is tested
-         * against the newly received tick.
-         *
-         * This measures historical signal performance.
-         * It is NOT a prediction of the next digit.
-         */
-        setValidation((previousValidation) => {
-          if (previous.length < 100) {
-            return previousValidation;
-          }
+  const nextHistory = [...previous, digit].slice(-MAX_HISTORY);
 
-          const recent10 = previous.slice(-10);
-          const recent20 = previous.slice(-20);
+  /*
+   * NEXT-TICK VALIDATION
+   *
+   * Test the candidate selected from the previous
+   * 100-tick sample against the newly received digit.
+   *
+   * This measures historical performance only.
+   * It does NOT predict the next digit.
+   */
+  if (
+    validationStatus === "WAITING" &&
+    validationCandidate !== null &&
+    validationStartLength !== null &&
+    previous.length >= validationStartLength + 1
+  ) {
+    const hit = digit === validationCandidate;
 
-          const candidateScores = digits.map((candidate) => {
-            const overallCount = previous.filter(
-              (value) => value === candidate
-            ).length;
+    setValidationResults((results) => ({
+      tested: results.tested + 1,
+      hits: results.hits + (hit ? 1 : 0),
+      misses: results.misses + (hit ? 0 : 1),
+    }));
 
-            const overallRate =
-              (overallCount / previous.length) * 100;
+    setValidationStatus(hit ? "HIT" : "MISS");
+    setValidationCandidate(null);
+    setValidationStartLength(null);
+  }
 
-            const recent10Count = recent10.filter(
-              (value) => value === candidate
-            ).length;
-
-            const recent20Count = recent20.filter(
-              (value) => value === candidate
-            ).length;
-
-            const recent10Rate =
-              (recent10Count / recent10.length) * 100;
-
-            const recent20Rate =
-              (recent20Count / recent20.length) * 100;
-
-            let strength =
-              overallRate * 0.60 +
-              recent20Rate * 0.25 +
-              recent10Rate * 0.15;
-
-            if (
-              overallRate >= BASELINE &&
-              recent20Rate >= BASELINE &&
-              recent10Rate >= BASELINE
-            ) {
-              strength += 2;
-            }
-
-            if (overallRate < BASELINE) {
-              strength *= 0.75;
-            }
-
-            if (
-              recent10Rate >= 30 &&
-              overallRate < 12
-            ) {
-              strength *= 0.80;
-            }
-
-            if (overallRate < 5) {
-              strength *= 0.50;
-            }
-
-            return {
-              digit: candidate,
-              strength,
-              overallRate,
-              recent20Rate,
-              recent10Rate,
-            };
-          });
-
-          candidateScores.sort((a, b) => {
-            if (b.strength !== a.strength) {
-              return b.strength - a.strength;
-            }
-
-            if (b.overallRate !== a.overallRate) {
-              return b.overallRate - a.overallRate;
-            }
-
-            return b.recent20Rate - a.recent20Rate;
-          });
-
-          const previousTopCandidate =
-            candidateScores[0];
-
-          if (!previousTopCandidate) {
-            return previousValidation;
-          }
-
-          const hit =
-            digit === previousTopCandidate.digit;
-
-          return {
-            tested: previousValidation.tested + 1,
-            hits:
-              previousValidation.hits +
-              (hit ? 1 : 0),
-          };
-        });
-
-        return [...previous, digit].slice(-MAX_HISTORY);
-      });
-    } catch {
-      if (!active) return;
-
-      setConnection("Error");
-      setStatus("Connection failed");
-      timer = setTimeout(getTick, 3000);
-      return;
-    }
+  return nextHistory;
+});
 
     if (active) {
       timer = setTimeout(getTick, 1000);
