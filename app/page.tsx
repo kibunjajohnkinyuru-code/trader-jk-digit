@@ -211,21 +211,30 @@ const recent10Deviation =
  *
  * This is NOT the probability of the next digit.
  */
+/*
+ * Conservative statistical confidence.
+ *
+ * This measures consistency in the observed
+ * 100 / 20 / 10 tick samples.
+ *
+ * It is NOT the probability of the next digit.
+ */
+
 const overallEvidence =
-  Math.min(overallRate / 15, 1) * 40;
+  Math.min(overallRate / 15, 1) * 35;
 
 const recent20Evidence =
-  Math.min(recent20Rate / 20, 1) * 30;
+  Math.min(recent20Rate / 20, 1) * 25;
 
 const recent10Evidence =
-  Math.min(recent10Rate / 30, 1) * 20;
+  Math.min(recent10Rate / 30, 1) * 15;
 
 const consistency =
   Math.max(
     0,
     10 -
-      Math.abs(overallRate - recent20Rate) * 0.5 -
-      Math.abs(recent20Rate - recent10Rate) * 0.5
+      Math.abs(overallRate - recent20Rate) * 0.4 -
+      Math.abs(recent20Rate - recent10Rate) * 0.4
   );
 
 let confidence =
@@ -235,16 +244,23 @@ let confidence =
   consistency;
 
 /*
- * Penalize samples below the 10% baseline.
+ * Penalize a target that is below
+ * the 10% baseline.
  */
 if (overallRate < BASELINE) {
   confidence *= 0.70;
 }
 
+/*
+ * Never present statistical strength
+ * as an extremely high percentage.
+ */
 confidence = Math.min(
   Math.max(confidence, 0),
-  95
+  85
 );
+
+confidence = Number(confidence.toFixed(0));
   // Strong evidence
   if (
     overallRate >= 15 &&
