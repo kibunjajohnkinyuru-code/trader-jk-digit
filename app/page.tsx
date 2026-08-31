@@ -1443,4 +1443,4 @@ const resetAnalysis = () => {
       </div>
     </main>
   );
-      }
+ }
