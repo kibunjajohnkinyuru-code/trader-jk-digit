@@ -16,9 +16,20 @@ const [connection, setConnection] = useState("Starting");
 const [status, setStatus] = useState("Waiting for ticks");
 const [history, setHistory] = useState<number[]>([]);
 
-const [validation, setValidation] = useState({
+const [validationCandidate, setValidationCandidate] =
+  useState<number | null>(null);
+
+const [validationStatus, setValidationStatus] = useState<
+  "IDLE" | "WAITING" | "HIT" | "MISS"
+>("IDLE");
+
+const [validationStartLength, setValidationStartLength] =
+  useState<number | null>(null);
+
+const [validationResults, setValidationResults] = useState({
   tested: 0,
   hits: 0,
+  misses: 0,
 });
   useEffect(() => {
   let active = true;
@@ -679,7 +690,77 @@ const topSignal = useMemo(() => {
     className: "text-yellow-400",
   };
 }, [history.length, topCandidate]);
-  const resetAnalysis = () => {
+
+// NEXT-TICK VALIDATION
+const [validationCandidate, setValidationCandidate] =
+  useState<number | null>(null);
+
+const [validationStatus, setValidationStatus] = useState<
+  "IDLE" | "WAITING" | "HIT" | "MISS"
+>("IDLE");
+
+const [validationStartLength, setValidationStartLength] =
+  useState<number | null>(null);
+
+const [validationResults, setValidationResults] = useState({
+  tested: 0,
+  hits: 0,
+  misses: 0,
+});
+
+const startNextTickValidation = () => {
+  if (history.length < 100 || !topCandidate) {
+    return;
+  }
+
+  setValidationCandidate(topCandidate.digit);
+  setValidationStartLength(history.length);
+  setValidationStatus("WAITING");
+};
+
+useEffect(() => {
+  if (
+    validationStatus !== "WAITING" ||
+    validationCandidate === null ||
+    validationStartLength === null
+  ) {
+    return;
+  }
+
+  if (history.length <= validationStartLength) {
+    return;
+  }
+
+  const actualDigit = history[history.length - 1];
+
+  if (actualDigit === validationCandidate) {
+    setValidationStatus("HIT");
+
+    setValidationResults((previous) => ({
+      tested: previous.tested + 1,
+      hits: previous.hits + 1,
+      misses: previous.misses,
+    }));
+  } else {
+    setValidationStatus("MISS");
+
+    setValidationResults((previous) => ({
+      tested: previous.tested + 1,
+      hits: previous.hits,
+      misses: previous.misses + 1,
+    }));
+  }
+
+  setValidationCandidate(null);
+  setValidationStartLength(null);
+}, [
+  history,
+  validationStatus,
+  validationCandidate,
+  validationStartLength,
+]);
+
+const resetAnalysis = () => {
   setHistory([]);
   setPrice(null);
   setLastDigit(null);
