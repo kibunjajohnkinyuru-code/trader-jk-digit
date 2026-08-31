@@ -11,10 +11,12 @@ export default function Home() {
   const [market] = useState("1HZ100V");
 
   const [price, setPrice] = useState<string | null>(null);
-  const [lastDigit, setLastDigit] = useState<number | null>(null);
-  const [connection, setConnection] = useState("Starting");
-  const [status, setStatus] = useState("Waiting for ticks");
-  const [validation, setValidation] = useState({
+const [lastDigit, setLastDigit] = useState<number | null>(null);
+const [connection, setConnection] = useState("Starting");
+const [status, setStatus] = useState("Waiting for ticks");
+const [history, setHistory] = useState<number[]>([]);
+
+const [validation, setValidation] = useState({
   tested: 0,
   hits: 0,
 });
