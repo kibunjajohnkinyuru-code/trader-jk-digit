@@ -14,8 +14,10 @@ export default function Home() {
   const [lastDigit, setLastDigit] = useState<number | null>(null);
   const [connection, setConnection] = useState("Starting");
   const [status, setStatus] = useState("Waiting for ticks");
-  const [history, setHistory] = useState<number[]>([]);
-
+  const [validation, setValidation] = useState({
+  tested: 0,
+  hits: 0,
+});
   useEffect(() => {
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
