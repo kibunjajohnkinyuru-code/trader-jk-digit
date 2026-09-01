@@ -193,22 +193,6 @@ const counts = useMemo(() => {
  * This is historical validation only.
  * It is NOT a prediction or probability.
  */
-useEffect(() => {
-  if (
-    validationStatus !== "WAITING" ||
-    validationCandidate === null ||
-    validationStartLength === null
-  ) {
-    return;
-  }
-
-  if (history.length <= validationStartLength) {
-    return;
-  }
-
-  const actualDigit = history[history.length - 1];
-
-  const hit = actualDigit === validationCandidate;
 
   setValidationResults((previous) => ({
     tested: previous.tested + 1,
