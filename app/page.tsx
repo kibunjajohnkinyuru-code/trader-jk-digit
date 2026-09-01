@@ -16,7 +16,21 @@ export default function Home() {
   const [status, setStatus] = useState("Waiting for ticks");
 
   const [history, setHistory] = useState<number[]>([]);
+const [validationCandidate, setValidationCandidate] =
+  useState<number | null>(null);
 
+const [validationStatus, setValidationStatus] = useState<
+  "IDLE" | "WAITING" | "HIT" | "MISS"
+>("IDLE");
+
+const [validationStartLength, setValidationStartLength] =
+  useState<number | null>(null);
+
+const [validationResults, setValidationResults] = useState({
+  tested: 0,
+  hits: 0,
+  misses: 0,
+});
   /*
    * LIVE DERIV TICK FEED
    */
@@ -100,6 +114,45 @@ export default function Home() {
   /*
    * DIGIT FREQUENCY COUNTS
    */
+  /*
+ * NEXT-TICK VALIDATION
+ *
+ * Tests the selected candidate against exactly
+ * one newly received digit.
+ *
+ * Historical validation only.
+ */
+useEffect(() => {
+  if (
+    validationStatus !== "WAITING" ||
+    validationCandidate === null ||
+    validationStartLength === null
+  ) {
+    return;
+  }
+
+  if (history.length <= validationStartLength) {
+    return;
+  }
+
+  const actualDigit = history[history.length - 1];
+  const hit = actualDigit === validationCandidate;
+
+  setValidationResults((previous) => ({
+    tested: previous.tested + 1,
+    hits: previous.hits + (hit ? 1 : 0),
+    misses: previous.misses + (hit ? 0 : 1),
+  }));
+
+  setValidationStatus(hit ? "HIT" : "MISS");
+  setValidationCandidate(null);
+  setValidationStartLength(null);
+}, [
+  history,
+  validationStatus,
+  validationCandidate,
+  validationStartLength,
+]);
   const counts = useMemo(() => {
     const result: Record<number, number> = {};
 
@@ -158,7 +211,17 @@ export default function Home() {
       counts[digit] < counts[best] ? digit : best
     );
   }, [counts, history.length]);
+const topCandidate = mostFrequentDigit;
 
+const startNextTickValidation = () => {
+  if (history.length < MAX_HISTORY || topCandidate === null) {
+    return;
+  }
+
+  setValidationCandidate(topCandidate);
+  setValidationStartLength(history.length);
+  setValidationStatus("WAITING");
+};
   /*
    * BASIC ANALYSIS
    *
@@ -392,8 +455,8 @@ export default function Home() {
 
         </section>
 
-        {/* MATCH ANALYSIS */}
-        <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
+      {/* MATCH ANALYSIS */}
+       <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
           <h2 className="font-semibold mb-4">
             Match Analysis
@@ -465,6 +528,76 @@ export default function Home() {
                 {nonMatchPercentage}%
               </p>
 
+            </div>
+
+          </div>
+
+        </section>
+        
+        {/* NEXT-TICK VALIDATION */}
+        <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
+
+          <h2 className="font-semibold mb-4">
+            Next-Tick Validation
+          </h2>
+
+          <div className="rounded-xl bg-gray-900 p-4 mb-3">
+
+            <p className="text-xs text-gray-500">
+              CANDIDATE
+            </p>
+
+            <p className="text-4xl font-bold mt-1">
+              {validationCandidate ?? topCandidate ?? "—"}
+            </p>
+
+            <p className="text-xs text-gray-400 mt-2">
+              {validationStatus === "WAITING"
+                ? "Waiting for the next tick..."
+                : validationStatus === "HIT"
+                ? "HIT — candidate matched the next digit"
+                : validationStatus === "MISS"
+                ? "MISS — candidate did not match"
+                : "Ready to test the top-frequency digit"}
+            </p>
+
+          </div>
+
+          <button
+            onClick={startNextTickValidation}
+            disabled={
+              history.length < MAX_HISTORY ||
+              validationStatus === "WAITING" ||
+              topCandidate === null
+            }
+            className="w-full rounded-xl bg-white text-black p-3 font-bold disabled:opacity-40"
+          >
+            {validationStatus === "WAITING"
+              ? "Waiting for Next Tick..."
+              : "Test Next Tick"}
+          </button>
+
+          <div className="grid grid-cols-3 gap-2 mt-3">
+
+            <div className="rounded-xl bg-gray-900 p-3 text-center">
+              <p className="text-xs text-gray-500">TESTED</p>
+              <p className="text-xl font-bold">
+                {validationResults.tested}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-gray-900 p-3 text-center">
+              <p className="text-xs text-gray-500">HITS</p>
+              <p className="text-xl font-bold text-green-400">
+                {validationResults.hits}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-gray-900 p-3 text-center">
+              <p className="text-xs text-gray-500">MISSES</p>
+              <p className="text-xl font-bold text-red-400">
+                {validationResults.misses}
+              </p>
             </div>
 
           </div>
