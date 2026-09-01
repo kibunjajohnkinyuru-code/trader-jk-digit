@@ -124,6 +124,8 @@ const [validationResults, setValidationResults] = useState({
  */
 useEffect(() => {
   if (
+useEffect(() => {
+  if (
     validationStatus !== "WAITING" ||
     validationCandidate === null ||
     validationStartLength === null
@@ -148,7 +150,7 @@ useEffect(() => {
   setValidationCandidate(null);
   setValidationStartLength(null);
 }, [
-  history,
+  history.length,
   validationStatus,
   validationCandidate,
   validationStartLength,
