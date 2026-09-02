@@ -584,7 +584,7 @@ const startNextTickValidation = () => {
               : "Test Next Tick"}
           </button>
 
-          <div className="grid grid-cols-3 gap-2 mt-3">
+          <div className="grid grid-cols-4 gap-2 mt-3">
 
             <div className="rounded-xl bg-gray-900 p-3 text-center">
               <p className="text-xs text-gray-500">TESTED</p>
@@ -606,7 +606,12 @@ const startNextTickValidation = () => {
                 {validationResults.misses}
               </p>
             </div>
-
+<div className="rounded-xl bg-gray-900 p-3 text-center">
+  <p className="text-xs text-gray-500">ACCURACY</p>
+  <p className="text-xl font-bold">
+    {validationAccuracy.toFixed(2)}%
+  </p>
+</div>
           </div>
 
         </section>
