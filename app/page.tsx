@@ -31,6 +31,11 @@ const [validationResults, setValidationResults] = useState({
   hits: 0,
   misses: 0,
 });
+
+const validationAccuracy =
+  validationResults.tested > 0
+    ? (validationResults.hits / validationResults.tested) * 100
+    : 0;
   /*
    * LIVE DERIV TICK FEED
    */
