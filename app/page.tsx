@@ -34,7 +34,13 @@ const [validationResults, setValidationResults] = useState({
   hits: 0,
   misses: 0,
 });
-
+const [validationHistory, setValidationHistory] = useState<
+  {
+    candidate: number;
+    actual: number;
+    result: "HIT" | "MISS";
+  }[]
+>([]);
 const validationAccuracy =
   validationResults.tested > 0
     ? (validationResults.hits / validationResults.tested) * 100
@@ -147,7 +153,14 @@ useEffect(() => {
 
   const actualDigit = validationActualDigit;
   const hit = actualDigit === validationCandidate;
-
+setValidationHistory((previous) => [
+  ...previous,
+  {
+    candidate: validationCandidate,
+    actual: actualDigit,
+    result: hit ? "HIT" : "MISS",
+  },
+]);
   setValidationResults((previous) => ({
     tested: previous.tested + 1,
     hits: previous.hits + (hit ? 1 : 0),
@@ -645,7 +658,41 @@ setValidationTestedCandidate(topCandidate);
   </p>
 </div>
           </div>
+          <div className="mt-4">
+            <p className="text-xs text-gray-500 mb-2">
+              VALIDATION HISTORY
+            </p>
 
+            <div className="space-y-2">
+              {validationHistory
+                .slice()
+                .reverse()
+                .map((item, index) => (
+                  <div
+                    key={`${item.candidate}-${item.actual}-${index}`}
+                    className="flex items-center justify-between rounded-xl bg-gray-900 p-3"
+                  >
+                    <span className="text-sm">
+                      Candidate <strong>{item.candidate}</strong>
+                    </span>
+
+                    <span className="text-sm">
+                      Actual <strong>{item.actual}</strong>
+                    </span>
+
+                    <span
+                      className={
+                        item.result === "HIT"
+                          ? "text-green-400 font-bold"
+                          : "text-red-400 font-bold"
+                      }
+                    >
+                      {item.result}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          </div>
         </section>
 
         {/* SUMMARY */}
