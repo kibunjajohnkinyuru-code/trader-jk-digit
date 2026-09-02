@@ -19,7 +19,8 @@ export default function Home() {
   const [tickCount, setTickCount] = useState(0);
 const [validationCandidate, setValidationCandidate] =
   useState<number | null>(null);
-
+const [validationActualDigit, setValidationActualDigit] =
+  useState<number | null>(null);
 const [validationStatus, setValidationStatus] = useState<
   "IDLE" | "WAITING" | "HIT" | "MISS"
 >("IDLE");
@@ -85,6 +86,7 @@ const validationAccuracy =
 
         setPrice(String(data.quote));
         setLastDigit(digit);
+        setValidationActualDigit(digit);
         setConnection("Connected");
         setStatus("Live");
 
@@ -141,7 +143,7 @@ useEffect(() => {
     return;
   }
 
-  const actualDigit = history[history.length - 1];
+  const actualDigit = validationActualDigit;
   const hit = actualDigit === validationCandidate;
 
   setValidationResults((previous) => ({
@@ -155,7 +157,7 @@ useEffect(() => {
   setValidationStartTick(null);
 }, [
   tickCount,
-  history,
+  validationActualDigit,
   validationStatus,
   validationCandidate,
   validationStartTick,
