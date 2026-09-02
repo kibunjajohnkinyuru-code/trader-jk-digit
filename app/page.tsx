@@ -213,11 +213,6 @@ const recencyCandidate = useMemo(() => {
     scores[digit] += counts[digit] * 5;
   });
 
-  validationHistory.forEach((result) => {
-    if (result.result === "MISS") {
-      scores[result.candidate] -= 10;
-    }
-  });
 
   return digits.reduce((best, digit) =>
     scores[digit] > scores[best] ? digit : best
