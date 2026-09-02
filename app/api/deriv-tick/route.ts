@@ -85,6 +85,22 @@ export async function GET(request: Request) {
 
           return;
         }
+      } catch {
+        clearTimeout(timeout);
+        ws.close();
+
+        resolve(
+          NextResponse.json(
+            {
+              ok: false,
+              feed: "ERROR",
+              reason: "Invalid response from Deriv",
+            },
+            { status: 502 }
+          )
+        );
+      }
+    });
 
     ws.on("error", (error: Error) => {
       clearTimeout(timeout);
@@ -102,4 +118,4 @@ export async function GET(request: Request) {
       );
     });
   });
- }
+}
