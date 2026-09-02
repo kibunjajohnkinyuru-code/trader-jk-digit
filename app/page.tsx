@@ -267,7 +267,6 @@ const topCandidate = recencyCandidate;
       counts[digit] < counts[best] ? digit : best
     );
   }, [counts, history.length]);
-const topCandidate = recencyCandidate;
 
 const startNextTickValidation = () => {
   if (history.length < MAX_HISTORY || topCandidate === null) {
