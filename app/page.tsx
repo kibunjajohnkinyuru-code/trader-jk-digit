@@ -187,14 +187,18 @@ const recencyCandidate = useMemo(() => {
   });
 
   history.forEach((digit, index) => {
-    const weight = index + 1;
-    scores[digit] += weight;
+    const recencyWeight = index + 1;
+    scores[digit] += recencyWeight;
+  });
+
+  digits.forEach((digit) => {
+    scores[digit] += counts[digit] * 5;
   });
 
   return digits.reduce((best, digit) =>
     scores[digit] > scores[best] ? digit : best
   );
-}, [history]);
+}, [history, counts]);
   /*
    * SELECTED DIGIT STATISTICS
    */
