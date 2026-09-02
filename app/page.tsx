@@ -578,14 +578,14 @@ const startNextTickValidation = () => {
             </p>
 
             <p className="text-xs text-gray-400 mt-2">
-              {validationStatus === "WAITING"
-                ? "Waiting for the next tick..."
-                : validationStatus === "HIT"
-                ? "HIT — candidate matched the next digit"
-                : validationStatus === "MISS"
-                ? "MISS — candidate did not match"
-                : "Ready to test the top-frequency digit"}
-            </p>
+  {validationStatus === "WAITING"
+    ? "Waiting for the next tick..."
+    : validationStatus === "HIT"
+    ? "HIT — candidate matched the next digit"
+    : validationStatus === "MISS"
+    ? "MISS — candidate did not match"
+    : "Ready to test the analysis candidate"}
+      </p>
 
           </div>
 
