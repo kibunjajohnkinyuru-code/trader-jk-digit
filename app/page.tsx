@@ -16,6 +16,7 @@ export default function Home() {
   const [status, setStatus] = useState("Waiting for ticks");
 
   const [history, setHistory] = useState<number[]>([]);
+  const [tickCount, setTickCount] = useState(0);
 const [validationCandidate, setValidationCandidate] =
   useState<number | null>(null);
 
@@ -23,9 +24,8 @@ const [validationStatus, setValidationStatus] = useState<
   "IDLE" | "WAITING" | "HIT" | "MISS"
 >("IDLE");
 
-const [validationStartLength, setValidationStartLength] =
+const [validationStartTick, setValidationStartTick] =
   useState<number | null>(null);
-
 const [validationResults, setValidationResults] = useState({
   tested: 0,
   hits: 0,
@@ -83,11 +83,12 @@ const [validationResults, setValidationResults] = useState({
         setConnection("Connected");
         setStatus("Live");
 
-        setHistory((previous) => {
-          const updated = [...previous, digit];
+        setTickCount((previous) => previous + 1);
 
-          return updated.slice(-MAX_HISTORY);
-        });
+setHistory((previous) => {
+  const updated = [...previous, digit];
+  return updated.slice(-MAX_HISTORY);
+});
       } catch {
         if (!active) return;
 
@@ -126,12 +127,12 @@ useEffect(() => {
   if (
     validationStatus !== "WAITING" ||
     validationCandidate === null ||
-    validationStartLength === null
+    validationStartTick === null
   ) {
     return;
   }
 
-  if (history.length <= validationStartLength) {
+  if (tickCount <= validationStartTick) {
     return;
   }
 
@@ -146,12 +147,13 @@ useEffect(() => {
 
   setValidationStatus(hit ? "HIT" : "MISS");
   setValidationCandidate(null);
-  setValidationStartLength(null);
+  setValidationStartTick(null);
 }, [
-  history.length,
+  tickCount,
+  history,
   validationStatus,
   validationCandidate,
-  validationStartLength,
+  validationStartTick,
 ]);
   const counts = useMemo(() => {
     const result: Record<number, number> = {};
@@ -219,7 +221,7 @@ const startNextTickValidation = () => {
   }
 
   setValidationCandidate(topCandidate);
-  setValidationStartLength(history.length);
+  setValidationStartTick(tickCount);
   setValidationStatus("WAITING");
 };
   /*
