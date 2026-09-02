@@ -217,7 +217,7 @@ const recencyCandidate = useMemo(() => {
   return digits.reduce((best, digit) =>
     scores[digit] > scores[best] ? digit : best
   );
-}, [history, counts, validationHistory]);
+}, [history, counts]);
 
 const topCandidate = recencyCandidate;
   /*
