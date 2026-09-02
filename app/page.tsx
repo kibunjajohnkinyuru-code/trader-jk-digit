@@ -19,6 +19,8 @@ export default function Home() {
   const [tickCount, setTickCount] = useState(0);
 const [validationCandidate, setValidationCandidate] =
   useState<number | null>(null);
+  const [validationTestedCandidate, setValidationTestedCandidate] =
+  useState<number | null>(null);
 const [validationActualDigit, setValidationActualDigit] =
   useState<number | null>(null);
 const [validationStatus, setValidationStatus] = useState<
@@ -154,6 +156,7 @@ useEffect(() => {
 
   setValidationStatus(hit ? "HIT" : "MISS");
   setValidationCandidate(null);
+// Keep validationTestedCandidate so the UI shows the digit that was actually tested.
   setValidationStartTick(null);
 }, [
   tickCount,
@@ -251,6 +254,7 @@ const startNextTickValidation = () => {
   }
 
   setValidationCandidate(topCandidate);
+setValidationTestedCandidate(topCandidate);
   setValidationStartTick(tickCount);
   setValidationStatus("WAITING");
 };
@@ -580,7 +584,10 @@ const startNextTickValidation = () => {
             </p>
 
             <p className="text-4xl font-bold mt-1">
-              {validationCandidate ?? topCandidate ?? "—"}
+              {validationCandidate ??
+  validationTestedCandidate ??
+  topCandidate ??
+  "—"}
             </p>
 
             <p className="text-xs text-gray-400 mt-2">
