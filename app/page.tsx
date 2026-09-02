@@ -175,7 +175,26 @@ useEffect(() => {
 
     return result;
   }, [history]);
+const recencyCandidate = useMemo(() => {
+  if (history.length < MAX_HISTORY) {
+    return null;
+  }
 
+  const scores: Record<number, number> = {};
+
+  digits.forEach((digit) => {
+    scores[digit] = 0;
+  });
+
+  history.forEach((digit, index) => {
+    const weight = index + 1;
+    scores[digit] += weight;
+  });
+
+  return digits.reduce((best, digit) =>
+    scores[digit] > scores[best] ? digit : best
+  );
+}, [history]);
   /*
    * SELECTED DIGIT STATISTICS
    */
@@ -218,7 +237,7 @@ useEffect(() => {
       counts[digit] < counts[best] ? digit : best
     );
   }, [counts, history.length]);
-const topCandidate = mostFrequentDigit;
+const topCandidate = recencyCandidate;
 
 const startNextTickValidation = () => {
   if (history.length < MAX_HISTORY || topCandidate === null) {
