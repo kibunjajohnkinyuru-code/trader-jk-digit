@@ -833,4 +833,288 @@ export default function Home() {
 
           </div>
 
-          {/* ANALYSIS */}
+      {/* ANALYSIS BREAKDOWN */}
+          {candidateAnalysis && (
+            <div className="rounded-xl bg-gray-900 p-4 mb-3">
+
+              <p className="text-xs text-gray-500 mb-3">
+                ANALYSIS BASIS
+              </p>
+
+              <div className="space-y-2 text-sm">
+
+                <div className="flex justify-between">
+                  <span className="text-gray-400">
+                    Frequency
+                  </span>
+
+                  <span>
+                    {candidateAnalysis.frequencyScore.toFixed(1)}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-400">
+                    Recency
+                  </span>
+
+                  <span>
+                    {candidateAnalysis.recencyScore.toFixed(1)}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-400">
+                    Transition
+                  </span>
+
+                  <span>
+                    {candidateAnalysis.transitionScore.toFixed(1)}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-400">
+                    Short-term
+                  </span>
+
+                  <span>
+                    {candidateAnalysis.shortTermScore.toFixed(1)}
+                  </span>
+                </div>
+
+                <div className="border-t border-gray-800 pt-2 flex justify-between">
+                  <span className="text-gray-400">
+                    Previous digit
+                  </span>
+
+                  <span>
+                    {lastDigit ?? "—"}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-400">
+                    Transition matches
+                  </span>
+
+                  <span>
+                    {candidateAnalysis.transitionCount}
+                  </span>
+                </div>
+
+              </div>
+
+            </div>
+          )}
+
+          <button
+            onClick={startNextTickValidation}
+            disabled={
+              history.length < MAX_HISTORY ||
+              topCandidate === null ||
+              validationStatus === "WAITING"
+            }
+            className="w-full rounded-xl bg-white text-black p-3 font-bold disabled:opacity-40"
+          >
+            {validationStatus === "WAITING"
+              ? "Waiting for Next Tick..."
+              : "Test Next Tick"}
+          </button>
+
+          <div className="grid grid-cols-4 gap-2 mt-3">
+
+            <div className="rounded-xl bg-gray-900 p-3 text-center">
+              <p className="text-xs text-gray-500">
+                TESTED
+              </p>
+
+              <p className="text-xl font-bold">
+                {validationResults.tested}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-gray-900 p-3 text-center">
+              <p className="text-xs text-gray-500">
+                HITS
+              </p>
+
+              <p className="text-xl font-bold text-green-400">
+                {validationResults.hits}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-gray-900 p-3 text-center">
+              <p className="text-xs text-gray-500">
+                MISSES
+              </p>
+
+              <p className="text-xl font-bold text-red-400">
+                {validationResults.misses}
+              </p>
+            </div>
+
+            <div className="rounded-xl bg-gray-900 p-3 text-center">
+              <p className="text-xs text-gray-500">
+                ACCURACY
+              </p>
+
+              <p className="text-xl font-bold">
+                {validationAccuracy.toFixed(2)}%
+              </p>
+            </div>
+
+          </div>
+
+          {/* VALIDATION HISTORY */}
+          <div className="mt-4">
+
+            <p className="text-xs text-gray-500 mb-2">
+              VALIDATION HISTORY
+            </p>
+
+            {validationHistory.length === 0 ? (
+              <div className="rounded-xl bg-gray-900 p-3 text-sm text-gray-500">
+                No validation tests yet.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+
+                {validationHistory
+                  .slice()
+                  .reverse()
+                  .map((item, index) => (
+                    <div
+                      key={`${item.candidate}-${item.actual}-${index}`}
+                      className="flex items-center justify-between rounded-xl bg-gray-900 p-3"
+                    >
+
+                      <span className="text-sm">
+                        Candidate{" "}
+                        <strong>
+                          {item.candidate}
+                        </strong>
+                      </span>
+
+                      <span className="text-sm">
+                        Actual{" "}
+                        <strong>
+                          {item.actual}
+                        </strong>
+                      </span>
+
+                      <span
+                        className={
+                          item.result === "HIT"
+                            ? "text-green-400 font-bold"
+                            : "text-red-400 font-bold"
+                        }
+                      >
+                        {item.result}
+                      </span>
+
+                    </div>
+                  ))}
+
+              </div>
+            )}
+
+          </div>
+
+        </section>
+
+        {/* SUMMARY */}
+        <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
+
+          <h2 className="font-semibold mb-4">
+            Statistics
+          </h2>
+
+          <div className="grid grid-cols-2 gap-3">
+
+            <div className="rounded-xl bg-gray-900 p-4">
+
+              <p className="text-xs text-gray-500">
+                MOST FREQUENT
+              </p>
+
+              <p className="text-3xl font-bold">
+                {mostFrequentDigit ?? "—"}
+              </p>
+
+              {mostFrequentDigit !== null && (
+                <p className="text-xs text-gray-400 mt-1">
+                  {counts[mostFrequentDigit]} /{" "}
+                  {history.length}
+                </p>
+              )}
+
+            </div>
+
+            <div className="rounded-xl bg-gray-900 p-4">
+
+              <p className="text-xs text-gray-500">
+                LEAST FREQUENT
+              </p>
+
+              <p className="text-3xl font-bold">
+                {leastFrequentDigit ?? "—"}
+              </p>
+
+              {leastFrequentDigit !== null && (
+                <p className="text-xs text-gray-400 mt-1">
+                  {counts[leastFrequentDigit]} /{" "}
+                  {history.length}
+                </p>
+              )}
+
+            </div>
+
+          </div>
+
+        </section>
+
+        {/* RECENT DIGITS */}
+        <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4">
+
+          <h2 className="font-semibold mb-3">
+            Recent Digits
+          </h2>
+
+          <div className="flex flex-wrap gap-2">
+
+            {history.length === 0 ? (
+              <p className="text-sm text-gray-500">
+                Waiting for digits...
+              </p>
+            ) : (
+              history
+                .slice(-30)
+                .reverse()
+                .map((digit, index) => (
+                  <span
+                    key={`${digit}-${index}`}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${
+                      digit === selectedDigit
+                        ? "bg-white text-black"
+                        : "bg-gray-900"
+                    }`}
+                  >
+                    {digit}
+                  </span>
+                ))
+            )}
+
+          </div>
+
+        </section>
+
+        {/* FOOTER */}
+        <footer className="text-center text-xs text-gray-500 mt-6 pb-4">
+          Trader JK • Analysis only • Not financial advice
+        </footer>
+
+      </div>
+    </main>
+  );
+ }
