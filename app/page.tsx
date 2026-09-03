@@ -1,9 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const digits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 const MAX_HISTORY = 100;
+
+type ValidationStatus = "IDLE" | "WAITING" | "HIT" | "MISS";
+
+type ValidationItem = {
+  candidate: number;
+  actual: number;
+  result: "HIT" | "MISS";
+};
 
 export default function Home() {
   const [selectedDigit, setSelectedDigit] = useState(5);
@@ -17,34 +25,48 @@ export default function Home() {
 
   const [history, setHistory] = useState<number[]>([]);
   const [tickCount, setTickCount] = useState(0);
-const [validationCandidate, setValidationCandidate] =
-  useState<number | null>(null);
-  const [validationTestedCandidate, setValidationTestedCandidate] =
-  useState<number | null>(null);
-const [validationActualDigit, setValidationActualDigit] =
-  useState<number | null>(null);
-const [validationStatus, setValidationStatus] = useState<
-  "IDLE" | "WAITING" | "HIT" | "MISS"
->("IDLE");
 
-const [validationStartTick, setValidationStartTick] =
-  useState<number | null>(null);
-const [validationResults, setValidationResults] = useState({
-  tested: 0,
-  hits: 0,
-  misses: 0,
-});
-const [validationHistory, setValidationHistory] = useState<
-  {
-    candidate: number;
-    actual: number;
-    result: "HIT" | "MISS";
-  }[]
->([]);
-const validationAccuracy =
-  validationResults.tested > 0
-    ? (validationResults.hits / validationResults.tested) * 100
-    : 0;
+  /*
+   * NEXT-TICK VALIDATION
+   */
+  const [validationCandidate, setValidationCandidate] =
+    useState<number | null>(null);
+
+  const [validationTestedCandidate, setValidationTestedCandidate] =
+    useState<number | null>(null);
+
+  const [validationStatus, setValidationStatus] =
+    useState<ValidationStatus>("IDLE");
+
+  const [validationResults, setValidationResults] = useState({
+    tested: 0,
+    hits: 0,
+    misses: 0,
+  });
+
+  const [validationHistory, setValidationHistory] = useState<
+    ValidationItem[]
+  >([]);
+
+  /*
+   * REF USED TO VALIDATE THE VERY NEXT TICK.
+   *
+   * This avoids the race condition that can happen when
+   * validation depends on several asynchronously updated states.
+   */
+  const validationRef = useRef<{
+    candidate: number | null;
+    waiting: boolean;
+  }>({
+    candidate: null,
+    waiting: false,
+  });
+
+  const validationAccuracy =
+    validationResults.tested > 0
+      ? (validationResults.hits / validationResults.tested) * 100
+      : 0;
+
   /*
    * LIVE DERIV TICK FEED
    */
@@ -78,13 +100,9 @@ const validationAccuracy =
         const digit = Number(data.last_digit);
 
         /*
-         * Validate the digit before adding it.
+         * Validate the received digit before using it.
          */
-        if (
-          !Number.isInteger(digit) ||
-          digit < 0 ||
-          digit > 9
-        ) {
+        if (!Number.isInteger(digit) || digit < 0 || digit > 9) {
           setConnection("Error");
           setStatus("Invalid digit");
 
@@ -92,18 +110,60 @@ const validationAccuracy =
           return;
         }
 
+        /*
+         * IMPORTANT:
+         *
+         * If a validation test is waiting, this newly received
+         * digit is the ONE and ONLY tick used for that test.
+         */
+        if (
+          validationRef.current.waiting &&
+          validationRef.current.candidate !== null
+        ) {
+          const candidate = validationRef.current.candidate;
+          const actual = digit;
+          const hit = candidate === actual;
+
+          setValidationTestedCandidate(candidate);
+
+          setValidationHistory((previous) => [
+            ...previous,
+            {
+              candidate,
+              actual,
+              result: hit ? "HIT" : "MISS",
+            },
+          ]);
+
+          setValidationResults((previous) => ({
+            tested: previous.tested + 1,
+            hits: previous.hits + (hit ? 1 : 0),
+            misses: previous.misses + (hit ? 0 : 1),
+          }));
+
+          setValidationStatus(hit ? "HIT" : "MISS");
+
+          /*
+           * Clear the waiting state immediately so the same
+           * tick can never be validated twice.
+           */
+          validationRef.current = {
+            candidate: null,
+            waiting: false,
+          };
+        }
+
         setPrice(String(data.quote));
         setLastDigit(digit);
-        setValidationActualDigit(digit);
         setConnection("Connected");
         setStatus("Live");
 
         setTickCount((previous) => previous + 1);
 
-setHistory((previous) => {
-  const updated = [...previous, digit];
-  return updated.slice(-MAX_HISTORY);
-});
+        setHistory((previous) => {
+          const updated = [...previous, digit];
+          return updated.slice(-MAX_HISTORY);
+        });
       } catch {
         if (!active) return;
 
@@ -130,54 +190,6 @@ setHistory((previous) => {
   /*
    * DIGIT FREQUENCY COUNTS
    */
-  /*
- * NEXT-TICK VALIDATION
- *
- * Tests the selected candidate against exactly
- * one newly received digit.
- *
- * Historical validation only.
- */
-useEffect(() => {
-  if (
-    validationStatus !== "WAITING" ||
-    validationCandidate === null ||
-    validationStartTick === null
-  ) {
-    return;
-  }
-
-  if (tickCount <= validationStartTick) {
-    return;
-  }
-
-  const actualDigit = validationActualDigit;
-  const hit = actualDigit === validationCandidate;
-setValidationHistory((previous) => [
-  ...previous,
-  {
-    candidate: validationCandidate,
-    actual: actualDigit,
-    result: hit ? "HIT" : "MISS",
-  },
-]);
-  setValidationResults((previous) => ({
-    tested: previous.tested + 1,
-    hits: previous.hits + (hit ? 1 : 0),
-    misses: previous.misses + (hit ? 0 : 1),
-  }));
-
-  setValidationStatus(hit ? "HIT" : "MISS");
-  setValidationCandidate(null);
-// Keep validationTestedCandidate so the UI shows the digit that was actually tested.
-  setValidationStartTick(null);
-}, [
-  tickCount,
-  validationActualDigit,
-  validationStatus,
-  validationCandidate,
-  validationStartTick,
-]);
   const counts = useMemo(() => {
     const result: Record<number, number> = {};
 
@@ -193,71 +205,189 @@ setValidationHistory((previous) => [
 
     return result;
   }, [history]);
-const recencyCandidate = useMemo(() => {
-  if (history.length < MAX_HISTORY) {
-    return null;
-  }
 
-  const scores: Record<number, number> = {};
+  /*
+   * RECENCY SCORE
+   *
+   * More recent digits receive more weight.
+   */
+  const recencyScores = useMemo(() => {
+    const scores: Record<number, number> = {};
 
-  digits.forEach((digit) => {
-    scores[digit] = 0;
-  });
-
-  history.forEach((digit, index) => {
-    const recencyWeight = index + 1;
-    scores[digit] += recencyWeight;
-  });
-
-  digits.forEach((digit) => {
-    scores[digit] += counts[digit] * 5;
-  });
-
-
-  return digits.reduce((best, digit) =>
-    scores[digit] > scores[best] ? digit : best
-  );
-}, [history, counts]);
-
-
-  const transitionCandidate = useMemo(() => {
-  if (history.length < MAX_HISTORY) {
-    return null;
-  }
-
-  const transitions: Record<number, Record<number, number>> = {};
-
-  digits.forEach((from) => {
-    transitions[from] = {};
-
-    digits.forEach((to) => {
-      transitions[from][to] = 0;
+    digits.forEach((digit) => {
+      scores[digit] = 0;
     });
-  });
 
-  for (let i = 0; i < history.length - 1; i++) {
-    const from = history[i];
-    const to = history[i + 1];
+    history.forEach((digit, index) => {
+      const weight = index + 1;
+      scores[digit] += weight;
+    });
 
-    if (
-      from >= 0 &&
-      from <= 9 &&
-      to >= 0 &&
-      to <= 9
-    ) {
-      transitions[from][to]++;
+    return scores;
+  }, [history]);
+
+  /*
+   * TRANSITION MATRIX
+   *
+   * Counts which digit historically followed another digit.
+   */
+  const transitionData = useMemo(() => {
+    const transitions: Record<number, Record<number, number>> = {};
+
+    digits.forEach((from) => {
+      transitions[from] = {};
+
+      digits.forEach((to) => {
+        transitions[from][to] = 0;
+      });
+    });
+
+    for (let i = 0; i < history.length - 1; i++) {
+      const from = history[i];
+      const to = history[i + 1];
+
+      if (
+        from >= 0 &&
+        from <= 9 &&
+        to >= 0 &&
+        to <= 9
+      ) {
+        transitions[from][to]++;
+      }
     }
-  }
 
-  const lastDigit = history[history.length - 1];
+    return transitions;
+  }, [history]);
 
-  return digits.reduce((best, digit) =>
-    transitions[lastDigit][digit] > transitions[lastDigit][best]
-      ? digit
-      : best
-  );
-}, [history]);
-  const topCandidate = transitionCandidate;
+  /*
+   * COMBINED NEXT-TICK ANALYSIS
+   *
+   * The candidate is based on:
+   *
+   * 1. Overall frequency
+   * 2. Recent occurrence weighting
+   * 3. Transition frequency from the current last digit
+   * 4. Short-term frequency
+   *
+   * This is an analysis score, NOT a guarantee of the next digit.
+   */
+  const candidateAnalysis = useMemo(() => {
+    if (history.length < MAX_HISTORY) {
+      return null;
+    }
+
+    const last = history[history.length - 1];
+
+    if (last === undefined) {
+      return null;
+    }
+
+    const shortHistory = history.slice(-20);
+
+    const shortCounts: Record<number, number> = {};
+
+    digits.forEach((digit) => {
+      shortCounts[digit] = 0;
+    });
+
+    shortHistory.forEach((digit) => {
+      shortCounts[digit]++;
+    });
+
+    const transitionCounts = transitionData[last];
+
+    const maxFrequency = Math.max(...digits.map((d) => counts[d]), 1);
+
+    const maxRecency = Math.max(
+      ...digits.map((d) => recencyScores[d]),
+      1
+    );
+
+    const maxTransition = Math.max(
+      ...digits.map((d) => transitionCounts[d]),
+      1
+    );
+
+    const maxShort = Math.max(
+      ...digits.map((d) => shortCounts[d]),
+      1
+    );
+
+    const scores: Record<number, number> = {};
+
+    digits.forEach((digit) => {
+      const frequencyScore =
+        (counts[digit] / maxFrequency) * 35;
+
+      const recencyScore =
+        (recencyScores[digit] / maxRecency) * 25;
+
+      const transitionScore =
+        (transitionCounts[digit] / maxTransition) * 30;
+
+      const shortTermScore =
+        (shortCounts[digit] / maxShort) * 10;
+
+      scores[digit] =
+        frequencyScore +
+        recencyScore +
+        transitionScore +
+        shortTermScore;
+    });
+
+    const ranked = [...digits].sort(
+      (a, b) => scores[b] - scores[a]
+    );
+
+    const candidate = ranked[0];
+
+    const secondCandidate = ranked[1];
+
+    const candidateScore = scores[candidate];
+    const secondScore = scores[secondCandidate];
+
+    /*
+     * Confidence represents separation between the top
+     * two analysis scores. It is not a probability.
+     */
+    const confidence =
+      candidateScore > 0
+        ? Math.max(
+            0,
+            Math.min(
+              100,
+              ((candidateScore - secondScore) /
+                candidateScore) *
+                100
+            )
+          )
+        : 0;
+
+    return {
+      candidate,
+      confidence,
+      scores,
+      frequencyScore:
+        (counts[candidate] / maxFrequency) * 35,
+      recencyScore:
+        (recencyScores[candidate] / maxRecency) * 25,
+      transitionScore:
+        (transitionCounts[candidate] / maxTransition) * 30,
+      shortTermScore:
+        (shortCounts[candidate] / maxShort) * 10,
+      transitionCount: transitionCounts[candidate],
+      shortTermCount: shortCounts[candidate],
+    };
+  }, [
+    history,
+    counts,
+    recencyScores,
+    transitionData,
+  ]);
+
+  const topCandidate =
+    candidateAnalysis?.candidate ?? null;
+
   /*
    * SELECTED DIGIT STATISTICS
    */
@@ -301,21 +431,8 @@ const recencyCandidate = useMemo(() => {
     );
   }, [counts, history.length]);
 
-const startNextTickValidation = () => {
-  if (history.length < MAX_HISTORY || topCandidate === null) {
-    return;
-  }
-
-  setValidationCandidate(topCandidate);
-setValidationTestedCandidate(topCandidate);
-  setValidationStartTick(tickCount);
-  setValidationStatus("WAITING");
-};
   /*
-   * BASIC ANALYSIS
-   *
-   * This describes observed frequency only.
-   * It does not predict the next digit.
+   * BASIC SELECTED-DIGIT ANALYSIS
    */
   const analysis =
     history.length < 20
@@ -327,10 +444,55 @@ setValidationTestedCandidate(topCandidate);
       : "Normal range";
 
   /*
+   * START NEXT-TICK VALIDATION
+   *
+   * Captures the current candidate and waits for exactly
+   * one future tick.
+   */
+  const startNextTickValidation = () => {
+    if (
+      history.length < MAX_HISTORY ||
+      topCandidate === null ||
+      validationRef.current.waiting
+    ) {
+      return;
+    }
+
+    validationRef.current = {
+      candidate: topCandidate,
+      waiting: true,
+    };
+
+    setValidationCandidate(topCandidate);
+    setValidationTestedCandidate(topCandidate);
+    setValidationStatus("WAITING");
+  };
+
+  /*
    * RESET
    */
   const resetAnalysis = () => {
+    validationRef.current = {
+      candidate: null,
+      waiting: false,
+    };
+
     setHistory([]);
+    setPrice(null);
+    setLastDigit(null);
+    setTickCount(0);
+
+    setValidationCandidate(null);
+    setValidationTestedCandidate(null);
+    setValidationStatus("IDLE");
+
+    setValidationResults({
+      tested: 0,
+      hits: 0,
+      misses: 0,
+    });
+
+    setValidationHistory([]);
   };
 
   return (
@@ -480,7 +642,7 @@ setValidationTestedCandidate(topCandidate);
 
         </section>
 
-        {/* 0-9 FREQUENCY */}
+        {/* DIGIT FREQUENCY */}
         <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
           <div className="flex justify-between items-center mb-4">
@@ -544,8 +706,8 @@ setValidationTestedCandidate(topCandidate);
 
         </section>
 
-      {/* MATCH ANALYSIS */}
-       <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
+        {/* MATCH ANALYSIS */}
+        <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
           <h2 className="font-semibold mb-4">
             Match Analysis
@@ -622,12 +784,12 @@ setValidationTestedCandidate(topCandidate);
           </div>
 
         </section>
-        
-        {/* NEXT-TICK VALIDATION */}
+
+        {/* NEXT-TICK ANALYSIS */}
         <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
           <h2 className="font-semibold mb-4">
-            Next-Tick Validation
+            Next-Tick Analysis
           </h2>
 
           <div className="rounded-xl bg-gray-900 p-4 mb-3">
@@ -636,179 +798,39 @@ setValidationTestedCandidate(topCandidate);
               CANDIDATE
             </p>
 
-            <p className="text-4xl font-bold mt-1">
+            <p className="text-5xl font-bold mt-1">
               {validationCandidate ??
-  validationTestedCandidate ??
-  topCandidate ??
-  "—"}
+                validationTestedCandidate ??
+                topCandidate ??
+                "—"}
             </p>
 
-            <p className="text-xs text-gray-400 mt-2">
-  {validationStatus === "WAITING"
-    ? "Waiting for the next tick..."
-    : validationStatus === "HIT"
-    ? "HIT — candidate matched the next digit"
-    : validationStatus === "MISS"
-    ? "MISS — candidate did not match"
-    : "Ready to test the analysis candidate"}
-      </p>
+            <div className="mt-3">
 
-          </div>
+              <p className="text-xs text-gray-500">
+                CONFIDENCE
+              </p>
 
-          <button
-            onClick={startNextTickValidation}
-            disabled={
-              history.length < MAX_HISTORY ||
-              validationStatus === "WAITING" ||
-              topCandidate === null
-            }
-            className="w-full rounded-xl bg-white text-black p-3 font-bold disabled:opacity-40"
-          >
-            {validationStatus === "WAITING"
-              ? "Waiting for Next Tick..."
-              : "Test Next Tick"}
-          </button>
-
-          <div className="grid grid-cols-4 gap-2 mt-3">
-
-            <div className="rounded-xl bg-gray-900 p-3 text-center">
-              <p className="text-xs text-gray-500">TESTED</p>
               <p className="text-xl font-bold">
-                {validationResults.tested}
+                {candidateAnalysis
+                  ? `${candidateAnalysis.confidence.toFixed(1)}%`
+                  : "—"}
               </p>
+
             </div>
 
-            <div className="rounded-xl bg-gray-900 p-3 text-center">
-              <p className="text-xs text-gray-500">HITS</p>
-              <p className="text-xl font-bold text-green-400">
-                {validationResults.hits}
-              </p>
-            </div>
-
-            <div className="rounded-xl bg-gray-900 p-3 text-center">
-              <p className="text-xs text-gray-500">MISSES</p>
-              <p className="text-xl font-bold text-red-400">
-                {validationResults.misses}
-              </p>
-            </div>
-<div className="rounded-xl bg-gray-900 p-3 text-center">
-  <p className="text-xs text-gray-500">ACCURACY</p>
-  <p className="text-xl font-bold">
-    {validationAccuracy.toFixed(2)}%
-  </p>
-</div>
-          </div>
-          <div className="mt-4">
-            <p className="text-xs text-gray-500 mb-2">
-              VALIDATION HISTORY
+            <p className="text-xs text-gray-400 mt-3">
+              {history.length < MAX_HISTORY
+                ? "Collecting 100 ticks before analysis..."
+                : validationStatus === "WAITING"
+                ? "Waiting for the next tick..."
+                : validationStatus === "HIT"
+                ? "HIT — candidate matched the next digit"
+                : validationStatus === "MISS"
+                ? "MISS — candidate did not match"
+                : "Ready to test the analysis candidate"}
             </p>
 
-            <div className="space-y-2">
-              {validationHistory
-                .slice()
-                .reverse()
-                .map((item, index) => (
-                  <div
-                    key={`${item.candidate}-${item.actual}-${index}`}
-                    className="flex items-center justify-between rounded-xl bg-gray-900 p-3"
-                  >
-                    <span className="text-sm">
-                      Candidate <strong>{item.candidate}</strong>
-                    </span>
-
-                    <span className="text-sm">
-                      Actual <strong>{item.actual}</strong>
-                    </span>
-
-                    <span
-                      className={
-                        item.result === "HIT"
-                          ? "text-green-400 font-bold"
-                          : "text-red-400 font-bold"
-                      }
-                    >
-                      {item.result}
-                    </span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </section>
-
-        {/* SUMMARY */}
-        <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
-
-          <h2 className="font-semibold mb-4">
-            Statistics
-          </h2>
-
-          <div className="grid grid-cols-2 gap-3">
-
-            <div className="rounded-xl bg-gray-900 p-4">
-
-              <p className="text-xs text-gray-500">
-                MOST FREQUENT
-              </p>
-
-              <p className="text-3xl font-bold">
-                {mostFrequentDigit ?? "—"}
-              </p>
-
-            </div>
-
-            <div className="rounded-xl bg-gray-900 p-4">
-
-              <p className="text-xs text-gray-500">
-                LEAST FREQUENT
-              </p>
-
-              <p className="text-3xl font-bold">
-                {leastFrequentDigit ?? "—"}
-              </p>
-
-            </div>
-
           </div>
 
-        </section>
-
-        {/* RECENT DIGITS */}
-        <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4">
-
-          <h2 className="font-semibold mb-3">
-            Recent Digits
-          </h2>
-
-          <div className="flex flex-wrap gap-2">
-
-            {history
-              .slice(-30)
-              .reverse()
-              .map((digit, index) => (
-
-                <span
-                  key={`${digit}-${index}`}
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold ${
-                    digit === selectedDigit
-                      ? "bg-white text-black"
-                      : "bg-gray-900"
-                  }`}
-                >
-                  {digit}
-                </span>
-
-              ))}
-
-          </div>
-
-        </section>
-
-        {/* FOOTER */}
-        <footer className="text-center text-xs text-gray-500 mt-6">
-          Trader JK • Analysis only • Not financial advice
-        </footer>
-
-      </div>
-    </main>
-  );
- }
+          {/* ANA
