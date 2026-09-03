@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 const digits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 const MAX_HISTORY = 100;
+const SHORT_WINDOW = 20;
+const MEDIUM_WINDOW = 50;
+const RANDOM_BASELINE = 10;
 
 type ValidationStatus = "IDLE" | "WAITING" | "HIT" | "MISS";
 
@@ -26,9 +29,6 @@ export default function Home() {
   const [history, setHistory] = useState<number[]>([]);
   const [tickCount, setTickCount] = useState(0);
 
-  /*
-   * NEXT-TICK VALIDATION
-   */
   const [validationCandidate, setValidationCandidate] =
     useState<number | null>(null);
 
@@ -49,10 +49,9 @@ export default function Home() {
   >([]);
 
   /*
-   * REF USED TO VALIDATE THE VERY NEXT TICK.
-   *
-   * This avoids the race condition that can happen when
-   * validation depends on several asynchronously updated states.
+   * The ref stores the candidate being tested.
+   * This guarantees that exactly the next valid tick
+   * is used for validation.
    */
   const validationRef = useRef<{
     candidate: number | null;
@@ -62,13 +61,10 @@ export default function Home() {
     waiting: false,
   });
 
-  const validationAccuracy =
-    validationResults.tested > 0
-      ? (validationResults.hits / validationResults.tested) * 100
-      : 0;
-
   /*
-   * LIVE DERIV TICK FEED
+   * -------------------------------------------------------
+   * LIVE DERIV FEED
+   * -------------------------------------------------------
    */
   useEffect(() => {
     let active = true;
@@ -99,9 +95,6 @@ export default function Home() {
 
         const digit = Number(data.last_digit);
 
-        /*
-         * Validate the received digit before using it.
-         */
         if (!Number.isInteger(digit) || digit < 0 || digit > 9) {
           setConnection("Error");
           setStatus("Invalid digit");
@@ -111,18 +104,17 @@ export default function Home() {
         }
 
         /*
-         * IMPORTANT:
+         * NEXT-TICK VALIDATION
          *
-         * If a validation test is waiting, this newly received
-         * digit is the ONE and ONLY tick used for that test.
+         * The current digit is compared against the candidate
+         * captured immediately before this tick arrived.
          */
         if (
           validationRef.current.waiting &&
           validationRef.current.candidate !== null
         ) {
           const candidate = validationRef.current.candidate;
-          const actual = digit;
-          const hit = candidate === actual;
+          const hit = candidate === digit;
 
           setValidationTestedCandidate(candidate);
 
@@ -130,7 +122,7 @@ export default function Home() {
             ...previous,
             {
               candidate,
-              actual,
+              actual: digit,
               result: hit ? "HIT" : "MISS",
             },
           ]);
@@ -143,10 +135,6 @@ export default function Home() {
 
           setValidationStatus(hit ? "HIT" : "MISS");
 
-          /*
-           * Clear the waiting state immediately so the same
-           * tick can never be validated twice.
-           */
           validationRef.current = {
             candidate: null,
             waiting: false,
@@ -188,7 +176,9 @@ export default function Home() {
   }, [market]);
 
   /*
-   * DIGIT FREQUENCY COUNTS
+   * -------------------------------------------------------
+   * FREQUENCY
+   * -------------------------------------------------------
    */
   const counts = useMemo(() => {
     const result: Record<number, number> = {};
@@ -207,29 +197,61 @@ export default function Home() {
   }, [history]);
 
   /*
-   * RECENCY SCORE
-   *
-   * More recent digits receive more weight.
+   * -------------------------------------------------------
+   * WINDOW COUNTS
+   * -------------------------------------------------------
    */
-  const recencyScores = useMemo(() => {
-    const scores: Record<number, number> = {};
+  const shortCounts = useMemo(() => {
+    const result: Record<number, number> = {};
 
     digits.forEach((digit) => {
-      scores[digit] = 0;
+      result[digit] = 0;
     });
 
-    history.forEach((digit, index) => {
-      const weight = index + 1;
-      scores[digit] += weight;
+    history.slice(-SHORT_WINDOW).forEach((digit) => {
+      result[digit]++;
     });
 
-    return scores;
+    return result;
+  }, [history]);
+
+  const mediumCounts = useMemo(() => {
+    const result: Record<number, number> = {};
+
+    digits.forEach((digit) => {
+      result[digit] = 0;
+    });
+
+    history.slice(-MEDIUM_WINDOW).forEach((digit) => {
+      result[digit]++;
+    });
+
+    return result;
   }, [history]);
 
   /*
-   * TRANSITION MATRIX
-   *
-   * Counts which digit historically followed another digit.
+   * -------------------------------------------------------
+   * RECENCY
+   * -------------------------------------------------------
+   */
+  const recencyScores = useMemo(() => {
+    const result: Record<number, number> = {};
+
+    digits.forEach((digit) => {
+      result[digit] = 0;
+    });
+
+    history.forEach((digit, index) => {
+      result[digit] += index + 1;
+    });
+
+    return result;
+  }, [history]);
+
+  /*
+   * -------------------------------------------------------
+   * TRANSITIONS
+   * -------------------------------------------------------
    */
   const transitionData = useMemo(() => {
     const transitions: Record<number, Record<number, number>> = {};
@@ -247,10 +269,8 @@ export default function Home() {
       const to = history[i + 1];
 
       if (
-        from >= 0 &&
-        from <= 9 &&
-        to >= 0 &&
-        to <= 9
+        Number.isInteger(from) &&
+        Number.isInteger(to)
       ) {
         transitions[from][to]++;
       }
@@ -260,79 +280,83 @@ export default function Home() {
   }, [history]);
 
   /*
-   * COMBINED NEXT-TICK ANALYSIS
+   * -------------------------------------------------------
+   * CANDIDATE ENGINE
    *
-   * The candidate is based on:
+   * IMPORTANT:
+   * This is a statistical ranking system.
+   * It does NOT guarantee the next digit.
    *
-   * 1. Overall frequency
-   * 2. Recent occurrence weighting
-   * 3. Transition frequency from the current last digit
-   * 4. Short-term frequency
-   *
-   * This is an analysis score, NOT a guarantee of the next digit.
+   * The engine deliberately rejects weak signals.
+   * -------------------------------------------------------
    */
   const candidateAnalysis = useMemo(() => {
     if (history.length < MAX_HISTORY) {
       return null;
     }
 
-    const last = history[history.length - 1];
+    const current = history[history.length - 1];
 
-    if (last === undefined) {
+    if (current === undefined) {
       return null;
     }
 
-    const shortHistory = history.slice(-20);
-
-    const shortCounts: Record<number, number> = {};
-
-    digits.forEach((digit) => {
-      shortCounts[digit] = 0;
-    });
-
-    shortHistory.forEach((digit) => {
-      shortCounts[digit]++;
-    });
-
-    const transitionCounts = transitionData[last];
-
-    const maxFrequency = Math.max(...digits.map((d) => counts[d]), 1);
-
-    const maxRecency = Math.max(
-      ...digits.map((d) => recencyScores[d]),
-      1
-    );
-
-    const maxTransition = Math.max(
-      ...digits.map((d) => transitionCounts[d]),
-      1
-    );
-
-    const maxShort = Math.max(
-      ...digits.map((d) => shortCounts[d]),
-      1
-    );
+    const currentTransitions = transitionData[current];
 
     const scores: Record<number, number> = {};
 
+    /*
+     * Raw evidence.
+     */
     digits.forEach((digit) => {
-      const frequencyScore =
-        (counts[digit] / maxFrequency) * 35;
+      const overallRate =
+        counts[digit] / MAX_HISTORY;
 
-      const recencyScore =
-        (recencyScores[digit] / maxRecency) * 25;
+      const mediumRate =
+        mediumCounts[digit] / MEDIUM_WINDOW;
 
-      const transitionScore =
-        (transitionCounts[digit] / maxTransition) * 30;
+      const shortRate =
+        shortCounts[digit] / SHORT_WINDOW;
 
-      const shortTermScore =
-        (shortCounts[digit] / maxShort) * 10;
+      const transitionTotal = digits.reduce(
+        (sum, d) => sum + currentTransitions[d],
+        0
+      );
 
+      const transitionRate =
+        transitionTotal > 0
+          ? currentTransitions[digit] / transitionTotal
+          : 0;
+
+      /*
+       * Compare the observed rate against the
+       * theoretical 10% digit baseline.
+       */
+      const frequencyEdge =
+        overallRate / 0.1;
+
+      const mediumEdge =
+        mediumRate / 0.1;
+
+      const shortEdge =
+        shortRate / 0.1;
+
+      const transitionEdge =
+        transitionRate / 0.1;
+
+      /*
+       * Weighted statistical score.
+       *
+       * Overall frequency: 30
+       * Medium window:     25
+       * Short window:      20
+       * Transition:        25
+       */
       scores[digit] =
-        frequencyScore +
-        recencyScore +
-        transitionScore +
-        shortTermScore;
+        frequencyEdge * 30 +
+        mediumEdge * 25 +
+        shortEdge * 20 +
+        transitionEdge * 25;
     });
 
     const ranked = [...digits].sort(
@@ -340,56 +364,143 @@ export default function Home() {
     );
 
     const candidate = ranked[0];
+    const second = ranked[1];
 
-    const secondCandidate = ranked[1];
-
-    const candidateScore = scores[candidate];
-    const secondScore = scores[secondCandidate];
+    const firstScore = scores[candidate];
+    const secondScore = scores[second];
 
     /*
-     * Confidence represents separation between the top
-     * two analysis scores. It is not a probability.
+     * Difference between first and second.
      */
-    const confidence =
-      candidateScore > 0
-        ? Math.max(
-            0,
-            Math.min(
-              100,
-              ((candidateScore - secondScore) /
-                candidateScore) *
-                100
-            )
-          )
+    const separation =
+      firstScore > 0
+        ? ((firstScore - secondScore) / firstScore) * 100
         : 0;
+
+    /*
+     * Evidence for the selected candidate.
+     */
+    const overallRate =
+      counts[candidate] / MAX_HISTORY;
+
+    const mediumRate =
+      mediumCounts[candidate] / MEDIUM_WINDOW;
+
+    const shortRate =
+      shortCounts[candidate] / SHORT_WINDOW;
+
+    const transitionTotal = digits.reduce(
+      (sum, digit) => sum + currentTransitions[digit],
+      0
+    );
+
+    const transitionRate =
+      transitionTotal > 0
+        ? currentTransitions[candidate] / transitionTotal
+        : 0;
+
+    /*
+     * Convert evidence into an analysis score.
+     *
+     * This is intentionally conservative.
+     */
+    const frequencyStrength = Math.min(
+      100,
+      (overallRate / 0.1) * 50
+    );
+
+    const mediumStrength = Math.min(
+      100,
+      (mediumRate / 0.1) * 50
+    );
+
+    const shortStrength = Math.min(
+      100,
+      (shortRate / 0.1) * 50
+    );
+
+    const transitionStrength = Math.min(
+      100,
+      (transitionRate / 0.1) * 50
+    );
+
+    const evidenceScore =
+      frequencyStrength * 0.30 +
+      mediumStrength * 0.25 +
+      shortStrength * 0.20 +
+      transitionStrength * 0.25;
+
+    /*
+     * Candidate is considered strong enough only when:
+     *
+     * - Evidence score >= 70
+     * - Separation >= 5%
+     * - At least 2 transition observations
+     */
+    const transitionObservations =
+      currentTransitions[candidate];
+
+    const strongEnough =
+      evidenceScore >= 70 &&
+      separation >= 5 &&
+      transitionObservations >= 2;
+
+    let strength:
+      | "STRONG"
+      | "MODERATE"
+      | "WEAK"
+      | "NO CLEAR SIGNAL";
+
+    if (!strongEnough) {
+      strength = "NO CLEAR SIGNAL";
+    } else if (evidenceScore >= 85 && separation >= 10) {
+      strength = "STRONG";
+    } else if (evidenceScore >= 70) {
+      strength = "MODERATE";
+    } else {
+      strength = "WEAK";
+    }
 
     return {
       candidate,
-      confidence,
+      confidence: Math.min(
+        100,
+        Math.max(0, separation)
+      ),
+      evidenceScore,
+      separation,
+      strength,
+      frequencyRate: overallRate * 100,
+      mediumRate: mediumRate * 100,
+      shortRate: shortRate * 100,
+      transitionRate: transitionRate * 100,
+      transitionObservations,
+      score: firstScore,
+      secondScore,
+      currentDigit: current,
       scores,
-      frequencyScore:
-        (counts[candidate] / maxFrequency) * 35,
-      recencyScore:
-        (recencyScores[candidate] / maxRecency) * 25,
-      transitionScore:
-        (transitionCounts[candidate] / maxTransition) * 30,
-      shortTermScore:
-        (shortCounts[candidate] / maxShort) * 10,
-      transitionCount: transitionCounts[candidate],
-      shortTermCount: shortCounts[candidate],
     };
   }, [
     history,
     counts,
-    recencyScores,
+    shortCounts,
+    mediumCounts,
     transitionData,
   ]);
 
+  /*
+   * Only expose a candidate when the analysis engine
+   * considers the evidence sufficient.
+   */
   const topCandidate =
-    candidateAnalysis?.candidate ?? null;
+    candidateAnalysis?.strength !== "NO CLEAR SIGNAL"
+      ? candidateAnalysis?.candidate ?? null
+      : null;
 
   /*
-   * SELECTED DIGIT STATISTICS
+   * -------------------------------------------------------
+   * SELECTED DIGIT
+   * -------------------------------------------------------
    */
   const match = counts[selectedDigit];
 
@@ -405,8 +516,19 @@ export default function Home() {
       ? ((nonMatch / history.length) * 100).toFixed(1)
       : "0.0";
 
+  const analysis =
+    history.length < 20
+      ? "Collecting data"
+      : Number(matchPercentage) > 15
+      ? "Above recent average"
+      : Number(matchPercentage) < 5
+      ? "Below recent average"
+      : "Normal range";
+
   /*
-   * MOST FREQUENT DIGIT
+   * -------------------------------------------------------
+   * MOST FREQUENT
+   * -------------------------------------------------------
    */
   const mostFrequentDigit = useMemo(() => {
     if (history.length === 0) {
@@ -419,7 +541,9 @@ export default function Home() {
   }, [counts, history.length]);
 
   /*
-   * LEAST FREQUENT DIGIT
+   * -------------------------------------------------------
+   * LEAST FREQUENT
+   * -------------------------------------------------------
    */
   const leastFrequentDigit = useMemo(() => {
     if (history.length === 0) {
@@ -432,22 +556,9 @@ export default function Home() {
   }, [counts, history.length]);
 
   /*
-   * BASIC SELECTED-DIGIT ANALYSIS
-   */
-  const analysis =
-    history.length < 20
-      ? "Collecting data"
-      : Number(matchPercentage) > 15
-      ? "Above recent average"
-      : Number(matchPercentage) < 5
-      ? "Below recent average"
-      : "Normal range";
-
-  /*
-   * START NEXT-TICK VALIDATION
-   *
-   * Captures the current candidate and waits for exactly
-   * one future tick.
+   * -------------------------------------------------------
+   * VALIDATION
+   * -------------------------------------------------------
    */
   const startNextTickValidation = () => {
     if (
@@ -468,8 +579,20 @@ export default function Home() {
     setValidationStatus("WAITING");
   };
 
+  const validationAccuracy =
+    validationResults.tested > 0
+      ? (validationResults.hits /
+          validationResults.tested) *
+        100
+      : 0;
+
+  const validationEdge =
+    validationAccuracy - RANDOM_BASELINE;
+
   /*
+   * -------------------------------------------------------
    * RESET
+   * -------------------------------------------------------
    */
   const resetAnalysis = () => {
     validationRef.current = {
@@ -590,7 +713,9 @@ export default function Home() {
             {digits.map((digit) => (
               <button
                 key={digit}
-                onClick={() => setSelectedDigit(digit)}
+                onClick={() =>
+                  setSelectedDigit(digit)
+                }
                 className={`rounded-xl border p-3 font-bold ${
                   selectedDigit === digit
                     ? "border-white bg-white text-black"
@@ -645,19 +770,13 @@ export default function Home() {
         {/* DIGIT FREQUENCY */}
         <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
-          <div className="flex justify-between items-center mb-4">
+          <h2 className="font-semibold mb-4">
+            Digit Frequency
+          </h2>
 
-            <div>
-              <h2 className="font-semibold">
-                Digit Frequency
-              </h2>
-
-              <p className="text-xs text-gray-500 mt-1">
-                Latest {history.length} digits
-              </p>
-            </div>
-
-          </div>
+          <p className="text-xs text-gray-500 mb-4">
+            Latest {history.length} digits
+          </p>
 
           <div className="space-y-2">
 
@@ -667,8 +786,8 @@ export default function Home() {
 
               const percentage =
                 history.length > 0
-                  ? ((count / history.length) * 100).toFixed(1)
-                  : "0.0";
+                  ? (count / history.length) * 100
+                  : 0;
 
               return (
                 <div
@@ -686,7 +805,7 @@ export default function Home() {
                       className="h-full bg-white"
                       style={{
                         width: `${Math.min(
-                          Number(percentage) * 5,
+                          percentage * 5,
                           100
                         )}%`,
                       }}
@@ -695,7 +814,7 @@ export default function Home() {
                   </div>
 
                   <div className="w-16 text-right text-xs text-gray-400">
-                    {count} ({percentage}%)
+                    {count} ({percentage.toFixed(1)}%)
                   </div>
 
                 </div>
@@ -706,7 +825,7 @@ export default function Home() {
 
         </section>
 
-        {/* MATCH ANALYSIS */}
+     {/* MATCH ANALYSIS */}
         <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
           <h2 className="font-semibold mb-4">
@@ -805,6 +924,31 @@ export default function Home() {
                 "—"}
             </p>
 
+            <div className="mt-4">
+
+              <p className="text-xs text-gray-500">
+                SIGNAL STRENGTH
+              </p>
+
+              <p
+                className={`text-xl font-bold ${
+                  candidateAnalysis?.strength ===
+                  "STRONG"
+                    ? "text-green-400"
+                    : candidateAnalysis?.strength ===
+                      "MODERATE"
+                    ? "text-yellow-400"
+                    : "text-gray-400"
+                }`}
+              >
+                {history.length < MAX_HISTORY
+                  ? "COLLECTING"
+                  : candidateAnalysis?.strength ??
+                    "NO CLEAR SIGNAL"}
+              </p>
+
+            </div>
+
             <div className="mt-3">
 
               <p className="text-xs text-gray-500">
@@ -813,7 +957,9 @@ export default function Home() {
 
               <p className="text-xl font-bold">
                 {candidateAnalysis
-                  ? `${candidateAnalysis.confidence.toFixed(1)}%`
+                  ? `${candidateAnalysis.confidence.toFixed(
+                      1
+                    )}%`
                   : "—"}
               </p>
 
@@ -828,58 +974,82 @@ export default function Home() {
                 ? "HIT — candidate matched the next digit"
                 : validationStatus === "MISS"
                 ? "MISS — candidate did not match"
+                : topCandidate === null
+                ? "No sufficiently strong candidate."
                 : "Ready to test the analysis candidate"}
             </p>
 
           </div>
 
-      {/* ANALYSIS BREAKDOWN */}
+          {/* ANALYSIS EVIDENCE */}
           {candidateAnalysis && (
             <div className="rounded-xl bg-gray-900 p-4 mb-3">
 
               <p className="text-xs text-gray-500 mb-3">
-                ANALYSIS BASIS
+                ANALYSIS EVIDENCE
               </p>
 
               <div className="space-y-2 text-sm">
 
                 <div className="flex justify-between">
                   <span className="text-gray-400">
-                    Frequency
+                    Overall frequency
                   </span>
 
                   <span>
-                    {candidateAnalysis.frequencyScore.toFixed(1)}
+                    {candidateAnalysis.frequencyRate.toFixed(
+                      1
+                    )}
+                    %
                   </span>
                 </div>
 
                 <div className="flex justify-between">
                   <span className="text-gray-400">
-                    Recency
+                    Last 50
                   </span>
 
                   <span>
-                    {candidateAnalysis.recencyScore.toFixed(1)}
+                    {candidateAnalysis.mediumRate.toFixed(
+                      1
+                    )}
+                    %
                   </span>
                 </div>
 
                 <div className="flex justify-between">
                   <span className="text-gray-400">
-                    Transition
+                    Last 20
                   </span>
 
                   <span>
-                    {candidateAnalysis.transitionScore.toFixed(1)}
+                    {candidateAnalysis.shortRate.toFixed(
+                      1
+                    )}
+                    %
                   </span>
                 </div>
 
                 <div className="flex justify-between">
                   <span className="text-gray-400">
-                    Short-term
+                    Transition rate
                   </span>
 
                   <span>
-                    {candidateAnalysis.shortTermScore.toFixed(1)}
+                    {candidateAnalysis.transitionRate.toFixed(
+                      1
+                    )}
+                    %
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-400">
+                    Transition observations
+                  </span>
+
+                  <span>
+                    {candidateAnalysis.transitionObservations}
                   </span>
                 </div>
 
@@ -889,17 +1059,42 @@ export default function Home() {
                   </span>
 
                   <span>
-                    {lastDigit ?? "—"}
+                    {candidateAnalysis.currentDigit}
                   </span>
                 </div>
 
                 <div className="flex justify-between">
                   <span className="text-gray-400">
-                    Transition matches
+                    Evidence score
                   </span>
 
                   <span>
-                    {candidateAnalysis.transitionCount}
+                    {candidateAnalysis.evidenceScore.toFixed(
+                      1
+                    )}
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-400">
+                    Signal separation
+                  </span>
+
+                  <span>
+                    {candidateAnalysis.separation.toFixed(
+                      1
+                    )}
+                    %
+                  </span>
+                </div>
+
+                <div className="flex justify-between">
+                  <span className="text-gray-400">
+                    Random baseline
+                  </span>
+
+                  <span>
+                    {RANDOM_BASELINE.toFixed(1)}%
                   </span>
                 </div>
 
@@ -919,9 +1114,12 @@ export default function Home() {
           >
             {validationStatus === "WAITING"
               ? "Waiting for Next Tick..."
+              : topCandidate === null
+              ? "No Strong Candidate"
               : "Test Next Tick"}
           </button>
 
+          {/* VALIDATION STATS */}
           <div className="grid grid-cols-4 gap-2 mt-3">
 
             <div className="rounded-xl bg-gray-900 p-3 text-center">
@@ -965,6 +1163,30 @@ export default function Home() {
             </div>
 
           </div>
+
+          {/* BASELINE */}
+          {validationResults.tested > 0 && (
+            <div className="rounded-xl bg-gray-900 p-3 mt-3 text-center">
+
+              <p className="text-xs text-gray-500">
+                PERFORMANCE VS 10% BASELINE
+              </p>
+
+              <p
+                className={`text-lg font-bold mt-1 ${
+                  validationEdge > 0
+                    ? "text-green-400"
+                    : validationEdge < 0
+                    ? "text-red-400"
+                    : "text-gray-300"
+                }`}
+              >
+                {validationEdge >= 0 ? "+" : ""}
+                {validationEdge.toFixed(2)}%
+              </p>
+
+            </div>
+          )}
 
           {/* VALIDATION HISTORY */}
           <div className="mt-4">
@@ -1023,7 +1245,7 @@ export default function Home() {
 
         </section>
 
-        {/* SUMMARY */}
+        {/* STATISTICS */}
         <section className="rounded-2xl border border-gray-800 bg-gray-950 p-4 mb-4">
 
           <h2 className="font-semibold mb-4">
@@ -1118,3 +1340,4 @@ export default function Home() {
     </main>
   );
  }
+  
