@@ -219,7 +219,7 @@ const recencyCandidate = useMemo(() => {
   );
 }, [history, counts]);
 
-const topCandidate = recencyCandidate;
+
   const transitionCandidate = useMemo(() => {
   if (history.length < MAX_HISTORY) {
     return null;
@@ -257,6 +257,7 @@ const topCandidate = recencyCandidate;
       : best
   );
 }, [history]);
+  const topCandidate = transitionCandidate;
   /*
    * SELECTED DIGIT STATISTICS
    */
