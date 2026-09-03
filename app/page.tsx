@@ -220,6 +220,43 @@ const recencyCandidate = useMemo(() => {
 }, [history, counts]);
 
 const topCandidate = recencyCandidate;
+  const transitionCandidate = useMemo(() => {
+  if (history.length < MAX_HISTORY) {
+    return null;
+  }
+
+  const transitions: Record<number, Record<number, number>> = {};
+
+  digits.forEach((from) => {
+    transitions[from] = {};
+
+    digits.forEach((to) => {
+      transitions[from][to] = 0;
+    });
+  });
+
+  for (let i = 0; i < history.length - 1; i++) {
+    const from = history[i];
+    const to = history[i + 1];
+
+    if (
+      from >= 0 &&
+      from <= 9 &&
+      to >= 0 &&
+      to <= 9
+    ) {
+      transitions[from][to]++;
+    }
+  }
+
+  const lastDigit = history[history.length - 1];
+
+  return digits.reduce((best, digit) =>
+    transitions[lastDigit][digit] > transitions[lastDigit][best]
+      ? digit
+      : best
+  );
+}, [history]);
   /*
    * SELECTED DIGIT STATISTICS
    */
